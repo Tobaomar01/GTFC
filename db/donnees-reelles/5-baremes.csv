@@ -1,0 +1,51 @@
+﻿taxe;critere_type;critere_code;borne_min;borne_max;montant;montant_unitaire;unite;commentaire
+patente;categorie;PHARM;;;25000;;;Montant MENSUEL
+patente;categorie;RESTO;;;15000;;;
+patente;categorie;BOUL;;;15000;;;
+patente;categorie;QUINC;;;12000;;;
+patente;categorie;ELEC;;;12000;;;
+patente;categorie;BOUCH;;;10000;;;
+patente;categorie;MECA;;;10000;;;
+patente;categorie;HABIL;;;8000;;;
+patente;categorie;COSMET;;;8000;;;
+patente;categorie;ALIM;;;7000;;;
+patente;categorie;TELEC;;;7000;;;
+patente;categorie;CAFE;;;6000;;;
+patente;categorie;GAZ;;;6000;;;
+patente;categorie;MENUIS;;;6000;;;
+patente;categorie;ARTIS;;;5000;;;
+patente;categorie;PAPET;;;5000;;;
+patente;categorie;COIFF;;;5000;;;
+patente;categorie;TAIL;;;4000;;;
+patente;categorie;POISS;;;4000;;;
+patente;categorie;FRUITS;;;3000;;;
+patente;categorie;AUTRE;;;3000;;;
+todp;zone;Z1;;;;600;m²;Tarif au m2 par MOIS
+todp;zone;Z2;;;;500;m²;
+todp;zone;Z3;;;;400;m²;
+teom;categorie;RESTO;;;5000;;;Forfait MENSUEL
+teom;categorie;BOUCH;;;5000;;;
+teom;categorie;POISS;;;5000;;;
+teom;categorie;FRUITS;;;5000;;;
+teom;categorie;BOUL;;;5000;;;
+teom;categorie;ALIM;;;3000;;;
+teom;categorie;CAFE;;;3000;;;
+teom;categorie;MECA;;;3000;;;
+teom;categorie;MENUIS;;;3000;;;
+teom;categorie;GAZ;;;3000;;;
+teom;categorie;TAIL;;;2000;;;
+teom;categorie;COIFF;;;2000;;;
+teom;categorie;QUINC;;;2000;;;
+teom;categorie;ELEC;;;2000;;;
+teom;categorie;TELEC;;;2000;;;
+teom;categorie;PHARM;;;2000;;;
+teom;categorie;HABIL;;;2000;;;
+teom;categorie;COSMET;;;2000;;;
+teom;categorie;PAPET;;;2000;;;
+teom;categorie;ARTIS;;;2000;;;
+teom;categorie;AUTRE;;;2000;;;
+droit_place;emplacement;TABLE;;;;150;jour;Tarif JOURNALIER
+droit_place;emplacement;ETAL;;;;250;jour;
+droit_place;emplacement;CANTINE;;;;500;jour;
+droit_place;emplacement;HANGAR;;;;800;jour;
+enseigne;;;;;;1000;m²;Tarif au m2 par MOIS, toutes catégories

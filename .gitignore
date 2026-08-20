@@ -1,0 +1,89 @@
+# ---------------------------------------------------------------------------
+# Secrets — ne JAMAIS committer
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.template
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+credentials.json
+google-services.json
+
+# ---------------------------------------------------------------------------
+# Certificats et données d'exécution
+# ---------------------------------------------------------------------------
+infra/certbot/conf/
+infra/certbot/www/
+infra/certbot/log/
+infra/certbot/communes.txt
+infra/postgres/dumps/
+infra/nginx/sites/
+
+# ---------------------------------------------------------------------------
+# Sauvegardes
+# ---------------------------------------------------------------------------
+*.dump
+*.dump.sha256
+backups/
+
+# ---------------------------------------------------------------------------
+# Node.js
+# ---------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+build/
+coverage/
+.nyc_output/
+
+# ---------------------------------------------------------------------------
+# Next.js
+# ---------------------------------------------------------------------------
+.next/
+out/
+.vercel/
+
+# ---------------------------------------------------------------------------
+# React Native / Expo
+# ---------------------------------------------------------------------------
+.expo/
+.expo-shared/
+*.apk
+*.aab
+android/app/build/
+ios/
+
+# ---------------------------------------------------------------------------
+# Journaux
+# ---------------------------------------------------------------------------
+logs/
+*.log
+
+# ---------------------------------------------------------------------------
+# Éditeurs et systèmes
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/*
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Etat du deploiement (propre a chaque serveur)
+.deploiement-etat
+
+# Demonstration locale
+.env.demo
+.demo-logs/
+
+
+# Export de validation Metro
+apps/mobile/.export-test/

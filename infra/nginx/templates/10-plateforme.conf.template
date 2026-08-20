@@ -1,0 +1,319 @@
+# ============================================================================
+#  Sites de la plateforme GTFC
+#  Modèle : ${APP_DOMAIN}, ${API_PORT} et ${DASHBOARD_PORT} sont remplacés au
+#  démarrage du conteneur à partir du .env.
+#
+#  Hôtes servis :
+#    ${APP_DOMAIN}            -> dashboard super-admin (Next.js)
+#    gtfc.${APP_DOMAIN}       -> dashboard commune GTFC (Next.js, même appli)
+#    api.${APP_DOMAIN}        -> API Node.js / Express
+#    s3.${APP_DOMAIN}         -> MinIO S3 (URL pré-signées des photos)
+#    console.${APP_DOMAIN}    -> console d'administration MinIO
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Backends
+# ----------------------------------------------------------------------------
+upstream gtfc_api {
+    # L'API tourne sur l'HÔTE, gérée par PM2 (voir ecosystem.config.js)
+    server host.docker.internal:${API_PORT};
+    keepalive 32;
+}
+
+upstream gtfc_dashboard {
+    # Le dashboard Next.js tourne sur l'HÔTE, géré par PM2
+    server host.docker.internal:${DASHBOARD_PORT};
+    keepalive 32;
+}
+
+upstream gtfc_minio_s3 {
+    server minio:9000;
+    keepalive 16;
+}
+
+upstream gtfc_minio_console {
+    server minio:9001;
+}
+
+# ----------------------------------------------------------------------------
+# HTTP :80 — validation ACME + redirection HTTPS
+# ----------------------------------------------------------------------------
+server {
+    listen      80 default_server;
+    listen      [::]:80 default_server;
+    server_name _;
+
+    # Sonde utilisée par le healthcheck Docker — doit rester en HTTP
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # Défi HTTP-01 de Let's Encrypt : ne jamais rediriger cette URL
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type "text/plain";
+        access_log off;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ----------------------------------------------------------------------------
+# HTTPS — hôte par défaut : ferme la connexion pour toute requête dont le
+# nom d'hôte n'est pas reconnu (scan de ports, accès direct par IP).
+# ----------------------------------------------------------------------------
+server {
+    listen      443 ssl default_server;
+    listen      [::]:443 ssl default_server;
+    http2       on;
+    server_name _;
+
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+    include             /etc/nginx/snippets/ssl.conf;
+
+    return 444;
+}
+
+# ----------------------------------------------------------------------------
+# API Node.js — api.${APP_DOMAIN}
+# ----------------------------------------------------------------------------
+server {
+    listen      443 ssl;
+    listen      [::]:443 ssl;
+    http2       on;
+    server_name api.${APP_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+    include             /etc/nginx/snippets/ssl.conf;
+    include             /etc/nginx/snippets/security-headers.conf;
+
+    access_log /var/log/nginx/api.access.log main;
+    error_log  /var/log/nginx/api.error.log warn;
+
+    limit_conn conn_zone 40;
+
+    # --- Authentification : quota strict contre le bourrage d'identifiants --
+    location ~ ^/(auth/login|auth/refresh|auth/forgot-password) {
+        limit_req zone=login_zone burst=5 nodelay;
+        proxy_pass http://gtfc_api;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+
+    # --- Webhook Wave : jamais de limite de débit, Wave doit toujours passer
+    #     La vérification de signature HMAC est faite par l'API (phase 5).
+    location = /webhooks/wave {
+        proxy_pass http://gtfc_api;
+        include /etc/nginx/snippets/proxy.conf;
+        # Le corps brut est nécessaire au calcul de la signature
+        proxy_request_buffering off;
+    }
+
+    # --- Envoi des photos depuis l'app Android ------------------------------
+    location ~ ^/(uploads|commerces/[^/]+/photos) {
+        limit_req zone=upload_zone burst=20 nodelay;
+        client_max_body_size 25m;
+        proxy_request_buffering off;
+        proxy_pass http://gtfc_api;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+
+    # --- Synchronisation hors-ligne : lots volumineux, délai plus long ------
+    location = /sync/batch {
+        limit_req zone=api_zone burst=60 nodelay;
+        client_max_body_size 25m;
+        proxy_pass http://gtfc_api;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_read_timeout 300s;
+    }
+
+    location = /healthz {
+        access_log off;
+        proxy_pass http://gtfc_api;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+
+    location / {
+        limit_req zone=api_zone burst=60 nodelay;
+        proxy_pass http://gtfc_api;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+}
+
+# ----------------------------------------------------------------------------
+# Stockage photos — s3.${APP_DOMAIN}
+# Sert les URL pré-signées générées par l'API. Aucun bucket n'est public :
+# une URL sans signature valide reçoit une erreur de MinIO.
+# ----------------------------------------------------------------------------
+server {
+    listen      443 ssl;
+    listen      [::]:443 ssl;
+    http2       on;
+    server_name s3.${APP_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+    include             /etc/nginx/snippets/ssl.conf;
+
+    access_log /var/log/nginx/s3.access.log main;
+
+    client_max_body_size 0;          # MinIO gère lui-même la taille
+    chunked_transfer_encoding off;
+    ignore_invalid_headers off;
+
+    location / {
+        proxy_pass http://gtfc_minio_s3;
+        include /etc/nginx/snippets/proxy.conf;
+        # Indispensable pour les envois multipart S3
+        proxy_buffering         off;
+        proxy_request_buffering off;
+        proxy_read_timeout      300s;
+    }
+}
+
+# ----------------------------------------------------------------------------
+# Console d'administration MinIO — console.${APP_DOMAIN}
+# Réservée au développeur / super-admin.
+# ----------------------------------------------------------------------------
+server {
+    listen      443 ssl;
+    listen      [::]:443 ssl;
+    http2       on;
+    server_name console.${APP_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+    include             /etc/nginx/snippets/ssl.conf;
+
+    access_log /var/log/nginx/minio-console.access.log main;
+
+    # Décommentez et adaptez pour restreindre la console à l'IP de la mairie :
+    # allow 41.82.0.0/16;
+    # deny  all;
+
+    location / {
+        proxy_pass http://gtfc_minio_console;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_buffering         off;
+        proxy_request_buffering off;
+        real_ip_header X-Real-IP;
+    }
+}
+
+# ----------------------------------------------------------------------------
+# Dashboard web — ${APP_DOMAIN} (super-admin) et sous-domaines des communes
+#
+# Le nom d'hôte est transmis au dashboard via l'en-tête Host : c'est lui qui
+# détermine le locataire (commune) affiché. `gtfc.${APP_DOMAIN}` ne donnera
+# jamais accès aux données d'une autre commune — l'isolation est vérifiée
+# côté API à partir du JWT, pas seulement à partir du sous-domaine.
+#
+# IMPORTANT : chaque nouvelle commune doit être ajoutée au certificat.
+#             Utilisez scripts/add-commune-domain.sh <slug>
+# ---------------------------------------------------------------------------
+#  Portail du redevable — portail.${APP_DOMAIN}
+#
+#  Sert la même application Next.js que le tableau de bord, mais en n'exposant
+#  QUE les chemins du portail. Un nom exact est prioritaire sur le joker
+#  *.${APP_DOMAIN} : ce bloc gagne, et le tableau de bord n'est pas atteignable
+#  depuis cette adresse.
+# ---------------------------------------------------------------------------
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2       on;
+    server_name portail.${APP_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+    include             /etc/nginx/snippets/ssl.conf;
+    include             /etc/nginx/snippets/security-headers.conf;
+
+    access_log /var/log/nginx/portail.access.log main;
+    error_log  /var/log/nginx/portail.error.log warn;
+
+    limit_conn conn_zone 40;
+
+    # La racine mène au portail, pas à la connexion de la mairie.
+    location = / {
+        return 302 /portail;
+    }
+
+    location /_next/static/ {
+        proxy_pass http://gtfc_dashboard;
+        include /etc/nginx/snippets/proxy.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        access_log off;
+    }
+
+    location /portail {
+        proxy_pass http://gtfc_dashboard;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+
+    # Le mandataire du portail, en liste blanche lui aussi.
+    location /api/portail/ {
+        proxy_pass http://gtfc_dashboard;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+
+    # Page publique du QR : elle ne divulgue aucune donnée fiscale, et un
+    # commerçant qui scanne son propre autocollant doit tomber quelque part.
+    location /c/ {
+        proxy_pass http://gtfc_dashboard;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+
+    # Tout le reste — /commerces, /recouvrement, /agents… — n'existe pas ici.
+    location / {
+        return 404;
+    }
+}
+
+# ----------------------------------------------------------------------------
+server {
+    listen      443 ssl;
+    listen      [::]:443 ssl;
+    http2       on;
+    # Le joker attrape tous les sous-domaines de communes (gtfc., parcelles.,
+    # thies., ...). Les noms exacts (api., s3., console.) restent prioritaires
+    # dans Nginx, ils ne sont donc pas capturés ici.
+    server_name ${APP_DOMAIN} *.${APP_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+    include             /etc/nginx/snippets/ssl.conf;
+    include             /etc/nginx/snippets/security-headers.conf;
+
+    access_log /var/log/nginx/dashboard.access.log main;
+    error_log  /var/log/nginx/dashboard.error.log warn;
+
+    limit_conn conn_zone 40;
+
+    # Ressources statiques Next.js : empreinte dans le nom de fichier, donc
+    # cache long. Le `add_header` local remplace ceux hérités du snippet.
+    location /_next/static/ {
+        proxy_pass http://gtfc_dashboard;
+        include /etc/nginx/snippets/proxy.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        access_log off;
+    }
+
+    location /_next/image {
+        proxy_pass http://gtfc_dashboard;
+        include /etc/nginx/snippets/proxy.conf;
+        add_header Cache-Control "public, max-age=86400" always;
+    }
+
+    location / {
+        proxy_pass http://gtfc_dashboard;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+}

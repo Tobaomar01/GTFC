@@ -1,0 +1,13 @@
+﻿parametre;valeur;explication
+jour_exigibilite;10;Jour du mois où l'avis devient exigible (1 à 28)
+delai_grace_jours;5;Jours de tolérance avant application des pénalités
+taux_penalite_pct;10;Pourcentage de pénalité de retard
+penalite_plafond_pct;50;Plafond de la pénalité, en % du principal
+todp_surface_minimale_m2;1;Surface minimale facturée pour la TODP
+todp_surface_maximale_m2;;Plafond de surface TODP — laisser vide si aucun
+todp_arrondi;superieur;superieur | inferieur | proche | dixieme
+remise_paiement_annuel_pct;0;Remise si paiement annuel groupé
+encaissement_especes_autorise;oui;Les agents peuvent-ils encaisser en espèces ?
+objectif_visites_jour_agent;25;Objectif indicatif, affiché au tableau de bord
+delib_reference;À_REMPLACER;Numéro de la délibération du conseil municipal
+delib_date;À_REMPLACER;Date de la délibération, au format AAAA-MM-JJ

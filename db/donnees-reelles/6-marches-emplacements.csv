@@ -1,0 +1,6 @@
+﻿type;code;libelle;quartier_code;surface_type_m2;nb_places
+marche;M01;À_REMPLACER — Marché communal;Q08;;150
+emplacement;TABLE;À_REMPLACER — Table;;2;
+emplacement;ETAL;À_REMPLACER — Étal;;4;
+emplacement;CANTINE;À_REMPLACER — Cantine;;9;
+emplacement;HANGAR;À_REMPLACER — Hangar;;20;

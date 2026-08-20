@@ -1,0 +1,54 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "local"
+  },
+
+  "build": {
+    "_commentaire": "Trois profils. 'preview' produit un APK installable directement sur le telephone d'un agent, sans passer par Google Play : c'est celui des tests terrain de la phase 7.",
+
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.1.20:4000"
+      }
+    },
+
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.A_REMPLIR.sn"
+      },
+      "_commentaire": "APK a transferer directement sur les telephones des 3 agents pilotes. Aucun compte Google Play necessaire a ce stade."
+    },
+
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.A_REMPLIR.sn"
+      },
+      "_commentaire": "app-bundle (.aab) : format exige par Google Play. Non installable directement sur un telephone."
+    }
+  },
+
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "internal",
+        "_commentaire": "Piste 'internal' pour commencer : diffusion limitee aux testeurs declares, sans validation Google. Passer en 'production' apres les tests terrain."
+      }
+    }
+  }
+}

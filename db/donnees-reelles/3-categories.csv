@@ -1,0 +1,22 @@
+﻿code;libelle;todp_probable;enseigne_probable;sur_marche
+ALIM;À_REMPLACER — Alimentation générale / boutique;oui;oui;non
+FRUITS;À_REMPLACER — Fruits et légumes;oui;non;oui
+BOUCH;À_REMPLACER — Boucherie;oui;oui;oui
+POISS;À_REMPLACER — Poissonnerie;oui;non;oui
+RESTO;À_REMPLACER — Restaurant / gargote;oui;oui;non
+CAFE;À_REMPLACER — Café / buvette;oui;oui;non
+BOUL;À_REMPLACER — Boulangerie / pâtisserie;oui;oui;non
+TAIL;À_REMPLACER — Tailleur / couture;non;oui;non
+COIFF;À_REMPLACER — Coiffure / salon de beauté;non;oui;non
+QUINC;À_REMPLACER — Quincaillerie;oui;oui;non
+MENUIS;À_REMPLACER — Menuiserie / ébénisterie;oui;non;non
+MECA;À_REMPLACER — Mécanique auto / moto;oui;non;non
+ELEC;À_REMPLACER — Électronique / téléphonie;non;oui;non
+TELEC;À_REMPLACER — Télécentre / transfert d'argent;non;oui;non
+PHARM;À_REMPLACER — Pharmacie;non;oui;non
+HABIL;À_REMPLACER — Habillement / friperie;oui;oui;oui
+COSMET;À_REMPLACER — Cosmétiques / produits de beauté;non;oui;non
+PAPET;À_REMPLACER — Papeterie / librairie;non;oui;non
+GAZ;À_REMPLACER — Dépôt de gaz / charbon;oui;non;non
+ARTIS;À_REMPLACER — Artisanat / bijouterie;oui;oui;oui
+AUTRE;À_REMPLACER — Autre activité;non;non;non

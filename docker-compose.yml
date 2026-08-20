@@ -1,0 +1,225 @@
+# ============================================================================
+#  Plateforme de collecte des taxes locales — GTFC
+#  Phase 1 : infrastructure serveur
+#
+#  Services conteneurisés  : PostgreSQL 16 + PostGIS, MinIO, Nginx, Certbot
+#  Services gérés par PM2  : API Node.js (phase 3), Dashboard Next.js (phase 6)
+#
+#  Démarrage :  docker compose up -d
+#  Etat      :  docker compose ps
+#  Logs      :  docker compose logs -f <service>
+# ============================================================================
+
+name: gtfc
+
+services:
+
+  # --------------------------------------------------------------------------
+  # Base de données : PostgreSQL 16 + PostGIS 3.4
+  # --------------------------------------------------------------------------
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: gtfc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_SUPERUSER}
+      POSTGRES_PASSWORD: ${DB_SUPERUSER_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      # Rôle applicatif créé par le script d'init
+      APP_DB_USER: ${DB_USER}
+      APP_DB_PASSWORD: ${DB_PASSWORD}
+      APP_DB_NAME: ${DB_NAME}
+      TZ: ${TZ}
+      PGTZ: ${TZ}
+      # Locale + collation pour un tri correct des noms de commerces en français
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c shared_buffers=${PG_SHARED_BUFFERS}
+      -c effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE}
+      -c work_mem=${PG_WORK_MEM}
+      -c maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM}
+      -c max_connections=${PG_MAX_CONNECTIONS}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Scripts exécutés UNE SEULE FOIS, à la toute première création du volume
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./infra/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      # Dossier partagé pour les dumps (utilisé par scripts/backup-postgres.sh)
+      - ./infra/postgres/dumps:/dumps
+    ports:
+      # Volontairement lié à 127.0.0.1 : la base n'est JAMAIS exposée à Internet
+      - "${DB_BIND_ADDRESS}:${DB_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_SUPERUSER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    shm_size: 512mb
+    networks:
+      - gtfc-net
+    logging: &default-logging
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # --------------------------------------------------------------------------
+  # Stockage objet : MinIO (compatible S3, 100 % auto-hébergé)
+  # --------------------------------------------------------------------------
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    container_name: gtfc-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER_REDIRECT_URL: https://console.${APP_DOMAIN}
+      MINIO_SERVER_URL: https://s3.${APP_DOMAIN}
+      TZ: ${TZ}
+    volumes:
+      - minio-data:/data
+    ports:
+      - "${MINIO_BIND_ADDRESS}:${MINIO_API_PORT}:9000"
+      - "${MINIO_BIND_ADDRESS}:${MINIO_CONSOLE_PORT}:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - gtfc-net
+    logging: *default-logging
+
+  # --------------------------------------------------------------------------
+  # Init MinIO : crée les buckets + l'utilisateur applicatif à droits restreints
+  # Conteneur éphémère — il s'arrête après avoir terminé (c'est normal).
+  # --------------------------------------------------------------------------
+  minio-init:
+    image: minio/mc:RELEASE.2024-10-08T09-37-26Z
+    container_name: gtfc-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET_PHOTOS: ${MINIO_BUCKET_PHOTOS}
+      MINIO_BUCKET_DOCUMENTS: ${MINIO_BUCKET_DOCUMENTS}
+      MINIO_BUCKET_QRCODES: ${MINIO_BUCKET_QRCODES}
+    volumes:
+      - ./infra/minio/init-buckets.sh:/init-buckets.sh:ro
+    entrypoint: ["/bin/sh", "/init-buckets.sh"]
+    restart: "no"
+    networks:
+      - gtfc-net
+    logging: *default-logging
+
+  # --------------------------------------------------------------------------
+  # Reverse proxy : Nginx + terminaison TLS
+  # Proxifie vers l'API et le dashboard qui tournent sur l'HÔTE via PM2.
+  # --------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: gtfc-nginx
+    restart: unless-stopped
+    depends_on:
+      - minio
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_PORT: ${API_PORT}
+      DASHBOARD_PORT: ${DASHBOARD_PORT}
+      # Ne substituer QUE ces 3 variables : protège les $variables de Nginx
+      NGINX_ENVSUBST_FILTER: "^(APP_DOMAIN|API_PORT|DASHBOARD_PORT)$$"
+      # Sortie dans /etc/nginx/sites (et non conf.d) pour ignorer le
+      # default.conf livré avec l'image officielle.
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx/sites
+      TZ: ${TZ}
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/templates:/etc/nginx/templates:ro
+      - ./infra/nginx/snippets:/etc/nginx/snippets:ro
+      - ./infra/certbot/conf:/etc/letsencrypt
+      - ./infra/certbot/www:/var/www/certbot
+      - nginx-cache:/var/cache/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    extra_hosts:
+      # Permet au conteneur d'atteindre l'API et le dashboard sur l'hôte
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - gtfc-net
+    logging: *default-logging
+
+  # --------------------------------------------------------------------------
+  # Certbot : renouvellement automatique des certificats Let's Encrypt
+  # Tente un renouvellement toutes les 12 h (no-op si > 30 jours de validité).
+  # L'émission INITIALE se fait avec scripts/init-ssl.sh
+  # --------------------------------------------------------------------------
+  certbot:
+    image: certbot/certbot:v2.11.0
+    container_name: gtfc-certbot
+    restart: unless-stopped
+    volumes:
+      - ./infra/certbot/conf:/etc/letsencrypt
+      - ./infra/certbot/www:/var/www/certbot
+      - ./infra/certbot/log:/var/log/letsencrypt
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+      while :; do
+        certbot renew --webroot -w /var/www/certbot --quiet --deploy-hook 'touch /etc/letsencrypt/.renewed';
+        sleep 12h & wait $${!};
+      done"
+    networks:
+      - gtfc-net
+    logging: *default-logging
+
+  # --------------------------------------------------------------------------
+  # Recharge Nginx quand Certbot a renouvelé un certificat
+  # --------------------------------------------------------------------------
+  nginx-reloader:
+    image: docker:27-cli
+    container_name: gtfc-nginx-reloader
+    restart: unless-stopped
+    depends_on:
+      - nginx
+      - certbot
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./infra/certbot/conf:/etc/letsencrypt
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+      while :; do
+        if [ -f /etc/letsencrypt/.renewed ]; then
+          rm -f /etc/letsencrypt/.renewed;
+          docker exec gtfc-nginx nginx -s reload || true;
+        fi;
+        sleep 6h & wait $${!};
+      done"
+    logging: *default-logging
+
+volumes:
+  postgres-data:
+    name: gtfc-postgres-data
+  minio-data:
+    name: gtfc-minio-data
+  nginx-cache:
+    name: gtfc-nginx-cache
+
+networks:
+  gtfc-net:
+    name: gtfc-net
+    driver: bridge

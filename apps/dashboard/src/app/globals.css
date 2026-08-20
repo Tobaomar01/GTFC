@@ -1,0 +1,195 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===========================================================================
+   Palette
+   ---------------------------------------------------------------------------
+   Les couleurs de STATUT FISCAL sont imposées par le cahier des charges
+   (vert / orange / rouge) et elles sont VALIDÉES : les six contrôles de la
+   méthode de visualisation passent dans les deux modes, sans bande
+   d'avertissement.
+
+     clair  (surface #FFFFFF) — daltonisme ΔE 10,1 · vision normale ΔE 20,1
+     sombre (surface #1A1A19) — daltonisme ΔE  8,3 · vision normale ΔE 16,9
+
+   Le mode sombre n'est PAS une inversion automatique : ce sont des pas
+   choisis pour la surface sombre, puis validés comme un ensemble.
+
+   Ne modifiez aucun hexadécimal sans relancer le validateur — la commande
+   figure dans docs/PHASE-6-dashboard.md.
+
+   `exonéré` et `non facturé` sont volontairement peu chromatiques : ce sont
+   des états « sans couleur », qui portent leur identité par l'étiquette et la
+   légende, jamais par la teinte seule.
+   =========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  --surface: #FFFFFF;
+  --surface-alt: #F0F3EF;
+  --plan: #F5F6F4;
+  --encre: #16211A;
+  --encre-2: #4A5850;
+  --encre-attenuee: #7A857E;
+  --bordure: #D8DED7;
+  --grille: #E3E7E2;
+
+  --marque: #0B5D2B;
+  --marque-clair: #1D7A45;
+
+  --st-ajour: #1D7A45;
+  --st-partiel: #CF8000;
+  --st-impaye: #B3261E;
+  --st-exonere: #6B7A72;
+  --st-inconnu: #4A6FA5;
+
+  --serie: #2a78d6;
+
+  /* Fonds de badge : la teinte de statut à ~12 %, jamais un aplat saturé */
+  --st-ajour-fond: #E8F2EC;
+  --st-partiel-fond: #FBF1E0;
+  --st-impaye-fond: #F9E9E8;
+  --st-exonere-fond: #EFF1F0;
+  --st-inconnu-fond: #EBEFF6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='clair'])) {
+    color-scheme: dark;
+
+    --surface: #1A1A19;
+    --surface-alt: #232322;
+    --plan: #0F0F0E;
+    --encre: #F2F4F1;
+    --encre-2: #B9C0BA;
+    --encre-attenuee: #8A968F;
+    --bordure: #33332F;
+    --grille: #2C2C2A;
+
+    --marque: #37A46B;
+    --marque-clair: #4CB77E;
+
+    --st-ajour: #37A46B;
+    --st-partiel: #C68200;
+    --st-impaye: #D4455C;
+    --st-exonere: #9AA79F;
+    --st-inconnu: #7FA0D4;
+
+    --serie: #3987e5;
+
+    --st-ajour-fond: #1D2C24;
+    --st-partiel-fond: #2E2617;
+    --st-impaye-fond: #301C1F;
+    --st-exonere-fond: #262826;
+    --st-inconnu-fond: #1E2530;
+  }
+}
+
+/* Le choix explicite de l'utilisateur l'emporte dans les deux sens. */
+:root[data-theme='sombre'] {
+  color-scheme: dark;
+
+  --surface: #1A1A19;
+  --surface-alt: #232322;
+  --plan: #0F0F0E;
+  --encre: #F2F4F1;
+  --encre-2: #B9C0BA;
+  --encre-attenuee: #8A968F;
+  --bordure: #33332F;
+  --grille: #2C2C2A;
+
+  --marque: #37A46B;
+  --marque-clair: #4CB77E;
+
+  --st-ajour: #37A46B;
+  --st-partiel: #C68200;
+  --st-impaye: #D4455C;
+  --st-exonere: #9AA79F;
+  --st-inconnu: #7FA0D4;
+
+  --serie: #3987e5;
+
+  --st-ajour-fond: #1D2C24;
+  --st-partiel-fond: #2E2617;
+  --st-impaye-fond: #301C1F;
+  --st-exonere-fond: #262826;
+  --st-inconnu-fond: #1E2530;
+}
+
+/* --------------------------------------------------------------------------- */
+html, body {
+  background: var(--plan);
+  color: var(--encre);
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Les colonnes de chiffres doivent s'aligner verticalement ; les grands
+   nombres isolés gardent des chiffres proportionnels (voir .figure-hero). */
+.chiffres-alignes { font-variant-numeric: tabular-nums; }
+
+.figure-hero {
+  font-size: clamp(2.5rem, 6vw, 3.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* Focus visible partout : la mairie navigue beaucoup au clavier. */
+:focus-visible {
+  outline: 2px solid var(--marque);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* --------------------------------------------------------------------------- */
+/* Leaflet — la feuille de style de la bibliothèque est importée par le
+   composant Carte ; on ajuste seulement ce qui doit suivre le thème.          */
+.leaflet-container {
+  background: var(--surface-alt);
+  font-family: inherit;
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--surface);
+  color: var(--encre);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+}
+.leaflet-popup-content { margin: 12px 14px; }
+.leaflet-bar a {
+  background: var(--surface);
+  color: var(--encre);
+  border-bottom-color: var(--bordure);
+}
+.leaflet-bar a:hover { background: var(--surface-alt); }
+
+/* En mode sombre, les tuiles OpenStreetMap sont trop lumineuses : on les
+   assombrit légèrement plutôt que de charger un second fond de carte —
+   aucun appel réseau supplémentaire. */
+:root[data-theme='sombre'] .leaflet-tile-pane {
+  filter: brightness(0.72) saturate(0.75) contrast(1.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='clair'])) .leaflet-tile-pane {
+    filter: brightness(0.72) saturate(0.75) contrast(1.05);
+  }
+}
+
+/* Impression : la mairie imprime les tableaux de bord pour le conseil. */
+@media print {
+  .sans-impression { display: none !important; }
+  body { background: #FFFFFF; }
+  .carte-impression { break-inside: avoid; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
