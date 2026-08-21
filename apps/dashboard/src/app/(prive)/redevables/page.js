@@ -42,8 +42,8 @@ export default function PageRedevables() {
       if (filtreStatut) params.set('statut_fiscal', filtreStatut);
 
       const [r, o] = await Promise.all([
-        api.get(`redevables?${params}`),
-        api.get('objets-sans-redevable').catch(() => ({ donnees: [] })),
+        api.get(`/redevables?${params}`),
+        api.get('/objets-sans-redevable').catch(() => ({ donnees: [] })),
       ]);
       setListe(r.donnees ?? []);
       setOrphelins(o.donnees ?? []);
@@ -206,7 +206,7 @@ function FicheRedevable({ id, onFerme, onMaj }) {
   const [message, setMessage] = useState(null);
 
   const charger = useCallback(async () => {
-    const r = await api.get(`redevables/${id}`);
+    const r = await api.get(`/redevables/${id}`);
     setFiche(r.donnees);
   }, [id]);
 
@@ -214,7 +214,7 @@ function FicheRedevable({ id, onFerme, onMaj }) {
 
   const envoyerCode = async () => {
     try {
-      const r = await api.post(`redevables/${id}/telephone/code`);
+      const r = await api.post(`/redevables/${id}/telephone/code`);
       setMessage(r.donnees?.code_simule
         ? `Code envoyé. Aucun opérateur SMS raccordé — code de démonstration : ${r.donnees.code_simule}`
         : 'Code envoyé. Demandez au redevable de vous le lire.');
@@ -312,7 +312,7 @@ function ObjetsOrphelins({ objets, onFerme, onMaj }) {
   useEffect(() => {
     if (recherche.length < 2) { setCandidats([]); return undefined; }
     const t = setTimeout(async () => {
-      const r = await api.get(`redevables?limite=8&q=${encodeURIComponent(recherche)}`);
+      const r = await api.get(`/redevables?limite=8&q=${encodeURIComponent(recherche)}`);
       setCandidats(r.donnees ?? []);
     }, 300);
     return () => clearTimeout(t);
@@ -320,8 +320,8 @@ function ObjetsOrphelins({ objets, onFerme, onMaj }) {
 
   const rattacher = async (redevableId) => {
     const chemin = cible.objet_type === 'affichage'
-      ? `affichages/${cible.objet_id}/redevable`
-      : `chantiers/${cible.objet_id}/redevable`;
+      ? `/affichages/${cible.objet_id}/redevable`
+      : `/chantiers/${cible.objet_id}/redevable`;
     try {
       await api.post(chemin, { redevable_id: redevableId });
       setMessage(`${cible.code} rattaché.`);

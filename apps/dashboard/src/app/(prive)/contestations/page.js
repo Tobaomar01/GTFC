@@ -58,7 +58,7 @@ export default function PageContestations() {
       } else if (filtre === 'closes') {
         params.set('statut', 'acceptee,rejetee,retiree');
       }
-      const r = await api.get(`contestations?${params}`);
+      const r = await api.get(`/contestations?${params}`);
       setListe(r.donnees ?? []);
     } catch (e) {
       setErreur(e.message);
@@ -196,7 +196,7 @@ function Instruction({ contestation, onFerme, onMaj }) {
     setOccupe(true);
     setMessage(null);
     try {
-      await api.post(`contestations/${contestation.id}/instruire`, {
+      await api.post(`/contestations/${contestation.id}/instruire`, {
         statut,
         notes: notes || undefined,
         suspend_recouvrement: suspendre,
@@ -214,7 +214,7 @@ function Instruction({ contestation, onFerme, onMaj }) {
     setOccupe(true);
     setMessage(null);
     try {
-      await api.post(`contestations/${contestation.id}/resoudre`, {
+      await api.post(`/contestations/${contestation.id}/resoudre`, {
         decision,
         motif_decision: motifDecision,
       });

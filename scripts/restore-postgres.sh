@@ -150,5 +150,5 @@ echo "  Une fois la restauration validée, supprimez-la :"
 echo "      docker exec -it ${CONTAINER} psql -U ${DB_SUPERUSER} -c 'DROP DATABASE \"${OLD_DB}\";'"
 echo
 echo "  Redémarrez ensuite les services :"
-echo "      pm2 start all"
+echo "      pm2 restart all"
 echo

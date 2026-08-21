@@ -181,7 +181,7 @@ pas. Notez-le immédiatement.
 
 ```bash
 cd ~/gtfc-platform
-pm2 start ecosystem.config.js --only gtfc-api,gtfc-scheduler
+pm2 startOrRestart ecosystem.config.js --only gtfc-api,gtfc-scheduler
 pm2 save                      # l'état est restauré après une coupure de courant
 pm2 status
 pm2 logs gtfc-api --lines 50

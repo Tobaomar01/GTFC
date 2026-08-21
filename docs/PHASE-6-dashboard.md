@@ -132,7 +132,7 @@ cd apps/dashboard && npm ci && npm run build && cd ../..
 ### Étape 2 — Démarrer
 
 ```bash
-pm2 start ecosystem.config.js
+pm2 startOrRestart ecosystem.config.js
 pm2 save
 pm2 status          # gtfc-api, gtfc-dashboard, gtfc-scheduler en « online »
 ```

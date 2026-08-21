@@ -48,15 +48,23 @@ const parametres = (obj = {}) => {
   return s ? `?${s}` : '';
 };
 
+/**
+ * Une route sans barre oblique initiale collerait au préfixe :
+ * `/api/proxy` + `redevables` donne `/api/proxyredevables`, qui n'existe
+ * pas. L'erreur est invisible à la compilation — c'est une chaîne — et ne se
+ * voit qu'en ouvrant la page. On la rattrape ici une fois pour toutes.
+ */
+const normaliser = (chemin) => (chemin.startsWith('/') ? chemin : `/${chemin}`);
+
 export const api = {
-  get: (chemin, params) => requete('GET', chemin + parametres(params)),
-  post: (chemin, corps) => requete('POST', chemin, corps),
-  patch: (chemin, corps) => requete('PATCH', chemin, corps),
-  delete: (chemin, corps) => requete('DELETE', chemin, corps),
+  get: (chemin, params) => requete('GET', normaliser(chemin) + parametres(params)),
+  post: (chemin, corps) => requete('POST', normaliser(chemin), corps),
+  patch: (chemin, corps) => requete('PATCH', normaliser(chemin), corps),
+  delete: (chemin, corps) => requete('DELETE', normaliser(chemin), corps),
 
   /** Réponse complète, pour lire la pagination. */
   async liste(chemin, params) {
-    const reponse = await fetch(`/api/proxy${chemin}${parametres(params)}`);
+    const reponse = await fetch(`/api/proxy${normaliser(chemin)}${parametres(params)}`);
     const resultat = await reponse.json().catch(() => null);
     if (!reponse.ok) {
       if (reponse.status === 401 && typeof window !== 'undefined') {

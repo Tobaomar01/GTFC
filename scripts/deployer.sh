@@ -517,8 +517,29 @@ etape_10() {
   charger_env
 
   info "Démarrage des services…"
-  executer pm2 start "${RACINE}/ecosystem.config.js" --update-env
+  # startOrRestart, PAS start.
+  #
+  # `pm2 start` sur une application déjà lancée répond « already launched » et
+  # ne fait rien : après une mise à jour, les processus continueraient de
+  # servir le code précédent. Le déploiement s'afficherait en vert, la recette
+  # passerait — sur l'ancienne version — et la correction resterait invisible.
+  executer pm2 startOrRestart "${RACINE}/ecosystem.config.js" --update-env
   executer pm2 save
+
+  # Un redémarrage qui échoue laisse l'ancien processus en place, et donc
+  # l'ancien code. On s'assure que les deux applications ont bien redémarré
+  # à l'instant, plutôt que de le supposer.
+  for app in gtfc-api gtfc-dashboard; do
+    secondes=$(pm2 jlist 2>/dev/null | node -e "
+      let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{
+        try{const a=JSON.parse(d).find(x=>x.name==='$app');
+          console.log(a?Math.round((Date.now()-a.pm2_env.pm_uptime)/1000):9999);}
+        catch(e){console.log(9999);}});" 2>/dev/null || echo 9999)
+    if [[ "$secondes" -gt 120 ]]; then
+      avertir "$app tourne depuis ${secondes}s — il n'a pas redémarré"
+      info "pm2 restart $app --update-env"
+    fi
+  done
 
   [[ "$SIMULATION" == "1" ]] && return 0
 
