@@ -19,10 +19,38 @@ import { STATUTS, xof } from '@/lib/format';
 
 const CENTRE_DEFAUT = [14.6862, -17.4470];   // Gueule Tapée-Fass-Colobane
 
-export default function CarteCommerces({ commerces = [], surSelection = null, hauteur = 560 }) {
+/**
+ * Paliers de recouvrement, lus dans les jetons du thème.
+ *
+ * Lus et non écrits en dur : la bascule clair/sombre change la rampe, et
+ * une couleur figée ici finirait par contredire le reste de l'interface.
+ */
+const PALIERS_RUE = [
+  { min: 80, jeton: '--rue-bon', libelle: 'Bon — 80 % et plus' },
+  { min: 50, jeton: '--rue-moyen', libelle: 'Moyen — 50 à 79 %' },
+  { min: 0, jeton: '--rue-faible', libelle: 'Faible — moins de 50 %' },
+];
+
+function jeton(nom, repli) {
+  if (typeof window === 'undefined') return repli;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(nom).trim();
+  return v || repli;
+}
+
+function couleurRue(taux) {
+  // Rien de dû n'est pas 0 % de recouvrement : c'est l'absence de facture.
+  if (taux === null || taux === undefined) return jeton('--rue-sans-objet', '#B9C0BA');
+  const palier = PALIERS_RUE.find((p) => taux >= p.min) ?? PALIERS_RUE[PALIERS_RUE.length - 1];
+  return jeton(palier.jeton, '#5C9E77');
+}
+
+export default function CarteCommerces({
+  commerces = [], rues = null, surSelection = null, hauteur = 560,
+}) {
   const conteneur = useRef(null);
   const carte = useRef(null);
   const couche = useRef(null);
+  const coucheRues = useRef(null);
   const [pret, setPret] = useState(false);
   const [erreur, setErreur] = useState(null);
 
@@ -67,6 +95,56 @@ export default function CarteCommerces({ commerces = [], surSelection = null, ha
       if (carte.current) { carte.current.remove(); carte.current = null; }
     };
   }, []);
+
+  // --- Rues, sous les marqueurs -------------------------------------------
+  useEffect(() => {
+    if (!pret || !carte.current || !rues) return undefined;
+    let annule = false;
+
+    (async () => {
+      const L = (await import('leaflet')).default;
+      if (annule || !carte.current) return;
+
+      if (coucheRues.current) { coucheRues.current.remove(); coucheRues.current = null; }
+
+      coucheRues.current = L.geoJSON(rues, {
+        style: (f) => ({
+          color: couleurRue(f.properties.taux_recouvrement_pct),
+          // 4 px : en dessous, un tracé disparaît sur le fond de tuiles ;
+          // au-dessus, il masque les marqueurs qu'on vient cliquer.
+          weight: 4,
+          opacity: 0.9,
+        }),
+        onEachFeature: (f, calque) => {
+          const p = f.properties;
+          const taux = p.taux_recouvrement_pct;
+
+          // Le libellé porte l'information, jamais la couleur seule.
+          const lecture = taux === null
+            ? 'Aucune facture émise sur cette rue'
+            : `${taux} % recouvré`;
+
+          calque.bindTooltip(
+            `<strong>${p.nom}</strong><br>${lecture}<br>`
+            + `${p.nb_redevables} redevable(s) · `
+            + `${Number(p.montant_restant).toLocaleString('fr-FR')} FCFA dus`,
+            { sticky: true },
+          );
+
+          // Viser une ligne de 4 px à la souris est déjà difficile sur une
+          // carte dense ; l'épaissir au survol évite de la reperdre.
+          calque.on('mouseover', () => calque.setStyle({ weight: 7 }));
+          calque.on('mouseout', () => calque.setStyle({ weight: 4 }));
+        },
+      }).addTo(carte.current);
+
+      // Derrière les marqueurs : c'est le commerce qu'on clique, la rue
+      // n'est qu'un fond de lecture.
+      coucheRues.current.bringToBack();
+    })();
+
+    return () => { annule = true; };
+  }, [pret, rues]);
 
   // --- Marqueurs, à chaque changement de données ---------------------------
   useEffect(() => {

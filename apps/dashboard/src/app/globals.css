@@ -45,6 +45,17 @@
   --st-exonere: #6B7A72;
   --st-inconnu: #4A6FA5;
 
+  /* --- Recouvrement par rue -------------------------------------------
+     Rampe séquentielle d'une seule teinte : le taux est une magnitude.
+     Trois paliers, parce que quatre ne se séparent pas assez sur un tracé
+     de 4 px — la meilleure rampe à quatre pas restait à ΔE 14,9 entre deux
+     voisins, sous le plancher de lisibilité.
+     Validée : CVD ΔE 17,3 · vision normale 17,5 · contraste ≥ 3:1 */
+  --rue-bon: #042A12;
+  --rue-moyen: #1B6B41;
+  --rue-faible: #5C9E77;
+  --rue-sans-objet: #B9C0BA;
+
   --serie: #2a78d6;
 
   /* Fonds de badge : la teinte de statut à ~12 %, jamais un aplat saturé */
@@ -108,6 +119,14 @@
   --st-impaye: #D4455C;
   --st-exonere: #9AA79F;
   --st-inconnu: #7FA0D4;
+
+    /* Recouvrement par rue — la rampe s'inverse sur fond sombre : « mieux »
+       est plus clair. Pas déduits du mode clair, mais validés contre la
+       surface sombre : vision normale ΔE 17,9 · contraste ≥ 3:1 */
+    --rue-bon: #B5E5C8;
+    --rue-moyen: #57B786;
+    --rue-faible: #2E7D53;
+    --rue-sans-objet: #4A5850;
 
   --serie: #3987e5;
 

@@ -130,6 +130,73 @@ router.get('/couverture', asyncHandler(async (req, res) => {
 }));
 
 // ===========================================================================
+//  PERFORMANCE PAR RUE
+//
+//  Ce que la phase 0 débloque : un taux de recouvrement à l'échelle où l'on
+//  peut agir. Une zone regroupe des milliers de commerces et sa moyenne ne
+//  désigne personne ; une rue en compte quelques dizaines, et un taux bas y
+//  désigne quelque chose de concret.
+// ===========================================================================
+router.get('/performance', valider(z.object({
+  quartier_id: uuid.optional(),
+  zone_id: uuid.optional(),
+  avec_redevables: z.enum(['oui']).optional(),
+}), 'query'), asyncHandler(async (req, res) => {
+  const filtres = [];
+  const params = [];
+
+  for (const champ of ['quartier_id', 'zone_id']) {
+    if (req.query[champ]) {
+      params.push(req.query[champ]);
+      // La vue expose les libellés, pas les identifiants : on repasse par la
+      // table des rues pour filtrer.
+      filtres.push(`rue_id IN (SELECT id FROM app.rue WHERE ${champ} = $${params.length})`);
+    }
+  }
+  // Les rues sans aucun redevable dominent la liste tant que le recensement
+  // n'est pas avancé — 78 sur 86 aujourd'hui. Les masquer donne la vue
+  // « où en est la collecte », les garder donne « où reste-t-il à passer ».
+  if (req.query.avec_redevables === 'oui') filtres.push('nb_redevables > 0');
+
+  const where = filtres.length ? `WHERE ${filtres.join(' AND ')}` : '';
+
+  const { rows } = await requete(req.contexte, `
+    SELECT * FROM app.v_performance_rue
+     ${where}
+     ORDER BY montant_restant DESC, nb_redevables DESC, nom
+     LIMIT 500`, params);
+
+  const avec = rows.filter((r) => r.nb_redevables > 0);
+  const du = avec.reduce((s2, r) => s2 + Number(r.montant_du), 0);
+  const paye = avec.reduce((s2, r) => s2 + Number(r.montant_paye), 0);
+
+  return ok(res, {
+    rues: rows,
+    // Le total sert de repère : une rue à 40 % se lit différemment selon que
+    // la commune est à 30 % ou à 80 %.
+    ensemble: {
+      nb_rues_avec_redevables: avec.length,
+      montant_du: du,
+      montant_paye: paye,
+      taux_recouvrement_pct: du > 0 ? Math.round((100 * paye) / du) : null,
+    },
+  });
+}));
+
+/**
+ * Tracés des rues en GeoJSON, avec leur performance.
+ *
+ * Séparé de /performance : la géométrie pèse plusieurs centaines de kilo-
+ * octets, et le tableau n'en a aucun besoin. Sur un poste de mairie en 3G,
+ * la différence se voit.
+ */
+router.get('/carte', asyncHandler(async (req, res) => {
+  const { rows } = await requete(req.contexte,
+    'SELECT app.rues_geojson($1) AS geojson', [req.utilisateur.communeId]);
+  return ok(res, rows[0].geojson);
+}));
+
+// ===========================================================================
 //  CRÉATION ET IMPORT
 // ===========================================================================
 router.post('/', exigerRole('admin_commune'), valider(corpsRue), asyncHandler(async (req, res) => {

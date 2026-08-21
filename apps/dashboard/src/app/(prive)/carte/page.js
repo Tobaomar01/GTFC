@@ -23,6 +23,13 @@ export default function PageCarte() {
 
   const [filtres, setFiltres] = useState({ zone_id: null, quartier_id: null, statut_fiscal: null });
 
+  // La couche des rues n'est pas chargée d'emblée : 58 Ko de géométrie sur
+  // une connexion de mairie ne se téléchargent pas « au cas où ». La carte
+  // répond d'abord à « où sont mes commerces » ; le taux de recouvrement par
+  // rue est une seconde lecture, qu'on demande.
+  const [afficherRues, setAfficherRues] = useState(false);
+  const [rues, setRues] = useState(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -39,6 +46,15 @@ export default function PageCarte() {
       } catch (err) { setErreur(err.message); }
     })();
   }, [filtres]);
+
+  useEffect(() => {
+    if (!afficherRues || rues) return;
+    (async () => {
+      try {
+        setRues(await api.get('/rues/carte'));
+      } catch (err) { setErreur(err.message); }
+    })();
+  }, [afficherRues, rues]);
 
   const totaux = useMemo(() => {
     const t = { a_jour: 0, partiel: 0, impaye: 0, exonere: 0, inconnu: 0, du: 0 };
@@ -99,13 +115,25 @@ export default function PageCarte() {
           Exporter
         </Bouton>}
       >
-        <div className="mb-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <LegendeStatuts statuts={ORDRE_STATUTS} />
+
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={afficherRues}
+              onChange={(e) => setAfficherRues(e.target.checked)}
+            />
+            <span className="text-[13px] text-encre-2">Recouvrement par rue</span>
+          </label>
         </div>
+
+        {afficherRues ? <LegendeRues chargee={Boolean(rues)} /> : null}
 
         {commerces === null ? <Chargement texte="Chargement des commerces…" /> : (
           <>
             <CarteDynamique
+        rues={afficherRues ? rues : null}
               commerces={commerces}
               surSelection={(c) => router.push(`/commerces?ouvrir=${c.id}`)}
             />
@@ -148,6 +176,45 @@ export default function PageCarte() {
           </p>
         )}
       </Carte>
+    </div>
+  );
+}
+
+/**
+ * Légende de la rampe de recouvrement.
+ *
+ * Permanente et non au survol : la couleur d'un tracé ne veut rien dire sans
+ * son échelle. Chaque palier porte son libellé — la teinte ne suffit jamais.
+ */
+function LegendeRues({ chargee }) {
+  const paliers = [
+    { jeton: 'var(--rue-bon)', libelle: 'Bon — 80 % et plus' },
+    { jeton: 'var(--rue-moyen)', libelle: 'Moyen — 50 à 79 %' },
+    { jeton: 'var(--rue-faible)', libelle: 'Faible — moins de 50 %' },
+    { jeton: 'var(--rue-sans-objet)', libelle: 'Aucune facture émise' },
+  ];
+
+  return (
+    <div className="mb-3 rounded-lg border border-bordure bg-surface-alt px-3 py-2">
+      {!chargee ? (
+        <p className="text-[13px] text-encre-2">Chargement des tracés…</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+          <span className="text-[12px] font-medium text-encre-2">
+            Recouvrement par rue
+          </span>
+          {paliers.map((p) => (
+            <span key={p.libelle} className="flex items-center gap-1.5">
+              <span
+                aria-hidden="true"
+                className="inline-block h-[3px] w-6 rounded-full"
+                style={{ backgroundColor: p.jeton }}
+              />
+              <span className="text-[12px] text-encre-2">{p.libelle}</span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

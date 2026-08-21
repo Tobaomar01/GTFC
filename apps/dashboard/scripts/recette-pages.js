@@ -111,6 +111,8 @@ const proxy = (route) => appel(`/api/proxy${route}`);
     ['Objets — dispositifs', '/affichages?limite=5'],
     ['Objets — chantiers', '/chantiers?limite=5'],
     ['Rues — couverture', '/rues/couverture'],
+    ['Rues — performance', '/rues/performance?avec_redevables=oui'],
+    ['Rues — tracés (carte)', '/rues/carte'],
     ['Commerces', '/commerces?limite=5'],
     ['Recouvrement', '/stats/recouvrement'],
     ['Tableau de bord', '/stats/tableau-bord'],
