@@ -12,6 +12,7 @@ import { ROLES, auMoins } from '@/lib/format';
 const PAGES = [
   { href: '/tableau-bord', libelle: "Vue d'ensemble", icone: '▤', role: 'superviseur' },
   { href: '/carte', libelle: 'Carte', icone: '◉', role: 'superviseur' },
+  { href: '/rues', libelle: 'Rues', icone: '⌇', role: 'superviseur' },
   { href: '/redevables', libelle: 'Redevables', icone: '☰', role: 'superviseur' },
   { href: '/commerces', libelle: 'Commerces', icone: '▦', role: 'superviseur' },
   { href: '/contestations', libelle: 'Contestations', icone: '⚖', role: 'superviseur' },

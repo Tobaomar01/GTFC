@@ -89,7 +89,7 @@ const proxy = (route) => appel(`/api/proxy${route}`);
   // -------------------------------------------------------------------------
   console.log(`\n  ${C.gras('Les pages s\'ouvrent')}`);
   for (const page of ['/tableau-bord', '/redevables', '/contestations', '/commerces',
-    '/recouvrement', '/carte', '/agents', '/audit']) {
+    '/recouvrement', '/carte', '/agents', '/audit', '/rues']) {
     const r = await appel(page);
     verifier(`${page}`, r.statut === 200, `statut ${r.statut}`);
   }
