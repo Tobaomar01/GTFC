@@ -171,27 +171,36 @@ FOR v_zone IN 1..3 LOOP
 END LOOP;
 
 -- ---------------------------------------------------------------------------
--- 6. Un marché de démonstration
+-- 6. Les marchés du référentiel
+--
+--  Plus de marché « de démonstration » : le référentiel en décrit sept, dont
+--  cinq permanents et un hebdomadaire. En créer un de plus produirait un
+--  doublon que l'agent verrait dans sa liste, sans savoir lequel choisir.
+--
+--  Seul le marché de Colobane est nommé par le PDC ; les cinq autres sont
+--  marqués à remplacer jusqu'à ce que la mairie fournisse les dénominations.
 -- ---------------------------------------------------------------------------
-INSERT INTO app.marche (commune_id, quartier_id, code, nom, geom, nb_places, jours_marche, a_remplacer)
-SELECT v_commune_id, q.id, 'M01',
-       'À_REMPLACER — Marché communal',
-       q.centre, 150, ARRAY['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'],
-       true
-FROM app.quartier q
-WHERE q.commune_id = v_commune_id AND q.code = 'Q08'
-ON CONFLICT (commune_id, code) DO NOTHING;
+PERFORM app.installer_marches(v_commune_id);
+
+-- Le marché de Colobane reçoit la géométrie du quartier, pour être visible
+-- sur la carte avant que la mairie n'en donne le tracé exact.
+UPDATE app.marche m
+   SET quartier_id = q.id, geom = q.centre, nb_places = 150
+  FROM app.quartier q
+ WHERE m.commune_id = v_commune_id AND m.code = 'MAR-04'
+   AND q.commune_id = v_commune_id AND q.code = 'Q08'
+   AND m.geom IS NULL;
 
 -- ---------------------------------------------------------------------------
--- 7. Types d'emplacement de marché
+-- 7. Types d'emplacement — installés par le référentiel
+--
+--  EMP-01 à EMP-07 viennent de app.installer_referentiel_codes(), appelée
+--  par le seed 0003. Les recréer ici sous d'autres codes ferait cohabiter
+--  « Cantine » et « EMP-04 Cantine » dans la liste de l'agent.
+--
+--  Les surfaces types restent à renseigner par la mairie : elles sortent de
+--  la délibération, pas d'une estimation.
 -- ---------------------------------------------------------------------------
-INSERT INTO ref.type_emplacement (commune_id, code, libelle, surface_type_m2, ordre_affichage, a_remplacer)
-VALUES
-    (v_commune_id, 'TABLE',   'À_REMPLACER — Table',   2.0, 10, true),
-    (v_commune_id, 'ETAL',    'À_REMPLACER — Étal',    4.0, 20, true),
-    (v_commune_id, 'CANTINE', 'À_REMPLACER — Cantine', 9.0, 30, true),
-    (v_commune_id, 'HANGAR',  'À_REMPLACER — Hangar', 20.0, 40, true)
-ON CONFLICT (commune_id, code) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 8. Motifs d'exonération

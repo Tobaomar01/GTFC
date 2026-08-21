@@ -163,10 +163,12 @@ DELETE FROM app.bareme_tranche WHERE bareme_id = v_bareme_id AND a_remplacer;
 INSERT INTO app.bareme_tranche (bareme_id, type_emplacement_id, libelle, montant, montant_unitaire, ordre, a_remplacer)
 SELECT v_bareme_id, e.id, 'À_REMPLACER — ' || e.code, 0,
        CASE e.code
-           WHEN 'TABLE'   THEN 150
-           WHEN 'ETAL'    THEN 250
-           WHEN 'CANTINE' THEN 500
-           WHEN 'HANGAR'  THEN 800
+           -- Codes du référentiel : EMP-05 étal/table, EMP-04 cantine,
+           -- EMP-06 hangar, EMP-07 magasin de marché.
+           WHEN 'EMP-05' THEN 250
+           WHEN 'EMP-04' THEN 500
+           WHEN 'EMP-06' THEN 800
+           WHEN 'EMP-07' THEN 1000
            ELSE 200
        END,
        e.ordre_affichage, true
