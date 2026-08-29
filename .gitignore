@@ -88,3 +88,8 @@ desktop.ini
 # Export de validation Metro
 apps/mobile/.export-test/
 apps/mobile/dist-verif/
+
+# Playwright
+apps/dashboard/test-results/
+apps/dashboard/playwright-report/
+apps/mobile/.export-verif/

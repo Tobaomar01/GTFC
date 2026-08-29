@@ -47,8 +47,10 @@ export default function PageRues() {
 
   const charger = useCallback(async () => {
     try {
-      const r = await api.get('/rues/couverture');
-      setDonnees(r.donnees);
+      // `api.get` rend déjà le contenu de l'enveloppe : demander « .donnees »
+      // une seconde fois donne undefined, et la page reste en chargement pour
+      // toujours. Elle n'avait jamais été ouverte.
+      setDonnees(await api.get('/rues/couverture'));
     } catch (e) {
       setErreur(e.message);
     }
@@ -69,8 +71,8 @@ export default function PageRues() {
   const rattacher = async () => {
     try {
       const r = await api.post('/rues/recalculer-rattachements', { seuil_m: 25 });
-      setMessage(`${r.donnees.rattaches} objet(s) rattaché(s). `
-        + `${r.donnees.sans_rue} restent sans rue — trop loin d'un tracé connu.`);
+      setMessage(`${r.rattaches} objet(s) rattaché(s). `
+        + `${r.sans_rue} restent sans rue — trop loin d'un tracé connu.`);
       charger();
     } catch (e) {
       setMessage(e.message);

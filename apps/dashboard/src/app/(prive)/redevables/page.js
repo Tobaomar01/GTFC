@@ -43,10 +43,12 @@ export default function PageRedevables() {
 
       const [r, o] = await Promise.all([
         api.get(`/redevables?${params}`),
-        api.get('/objets-sans-redevable').catch(() => ({ donnees: [] })),
+        // Le repli doit avoir la MÊME forme que le succès : une enveloppe
+        // ici et un tableau là, et le code d'après se trompe une fois sur deux.
+        api.get('/objets-sans-redevable').catch(() => []),
       ]);
-      setListe(r.donnees ?? []);
-      setOrphelins(o.donnees ?? []);
+      setListe(r ?? []);
+      setOrphelins(o ?? []);
     } catch (e) {
       setErreur(e.message);
     }
