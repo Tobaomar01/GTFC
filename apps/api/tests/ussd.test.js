@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { pool, un, fermer } = require('./aide');
+const { pool, fermer } = require('./aide');
 const ussd = require('../src/services/ussd.service');
 
 test.after(fermer);
@@ -14,19 +14,6 @@ test.after(fermer);
  * permettrait d'énumérer les redevables de la commune en composant au
  * hasard.
  */
-
-const contexte = { communeId: null, utilisateurId: null };
-// Le service attend un objet exposant requete(contexte, texte, valeurs).
-const db = { requete: (_c, t, v) => pool.query(t, v) };
-
-// Le service utilise le module de base du serveur ; on l'éprouve ici par sa
-// requête, en reproduisant la même logique de sélection.
-async function situation(telephone) {
-  return un(`
-    SELECT r.id FROM app.redevable r
-     WHERE r.telephone = $1 AND r.statut_telephone = 'verifie'
-       AND r.archive_le IS NULL`, [telephone]);
-}
 
 test('un numéro inconnu et un numéro non vérifié reçoivent le même texte', async () => {
   // On ne compare pas des libellés au hasard : c'est la MÊME constante.

@@ -17,7 +17,6 @@
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
 const { requete } = require('../config/database');
-const { erreurs } = require('../utils/erreurs');
 
 const PLAFOND = 20000;
 const VERT = '0B5D2B';

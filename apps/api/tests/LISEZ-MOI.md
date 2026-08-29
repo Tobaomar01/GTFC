@@ -83,3 +83,23 @@ migrations, tous les seeds — puis le jeu de tests complet. C'est le seul moyen
 de voir ce qu'une base de travail cache : elle porte des états qu'un serveur
 neuf n'aura jamais. La première exécution a trouvé un seed qui entrait en
 collision avec un déclencheur ajouté après lui.
+
+## Chasse aux défauts dans le code
+
+```bash
+npx eslint@9 --config eslint.defauts.mjs \
+  apps/api/src apps/api/scripts apps/api/tests \
+  apps/dashboard/src apps/mobile/src apps/mobile/outils
+```
+
+Ne cherche pas le style : uniquement les défauts qu'aucun test ne peut voir —
+un identifiant qui n'existe pas, une constante réassignée, une clé en double,
+du code inatteignable.
+
+Le tableau de bord n'a aucun test, et le seul défaut qu'on y a trouvé mettait
+une page entière hors service : `especes`, resté dans le code après le retrait
+des espèces. La compilation passait, l'écran plantait à l'ouverture. C'est
+cette famille-là que ce contrôle rattrape.
+
+La sortie doit rester **vide**. Un avertissement connu qu'on laisse traîner
+enterre celui qui viendra ensuite.

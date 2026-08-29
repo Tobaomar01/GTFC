@@ -23,7 +23,7 @@ const {
   z, valider, uuid, telephone, texteCourt, pagination, paramsId,
 } = require('../middleware/validation');
 const {
-  asyncHandler, ok, cree, lirePagination, pagine,
+  asyncHandler, ok, cree, lirePagination,
 } = require('../utils/reponse');
 const { erreurs } = require('../utils/erreurs');
 const otp = require('../services/otp.service');

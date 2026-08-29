@@ -22,7 +22,7 @@
 
 const config = require('../config/env');
 const logger = require('../config/logger');
-const { requete, avecContexte } = require('../config/database');
+const { requete } = require('../config/database');
 
 /** Un SMS fait 160 caractères. Au-delà il est facturé double, et tronqué par
  *  certains opérateurs : on compose donc court, et on vérifie. */

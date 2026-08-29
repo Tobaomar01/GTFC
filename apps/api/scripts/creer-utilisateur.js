@@ -21,7 +21,6 @@
 
 const crypto = require('crypto');
 const readline = require('readline');
-const config = require('../src/config/env');
 const { pool, avecContexte } = require('../src/config/database');
 
 /** Contexte super-admin : voir la note dans simuler-wave.js. */
