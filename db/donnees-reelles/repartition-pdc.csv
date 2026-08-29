@@ -1,0 +1,22 @@
+categorie_code;libelle_pdc;secteur;effectif;colobane;fass;gueule_tapee;source
+ACT-01;Boutiques alimentation;commerce;821;276;283;262;PDC tableau 20
+ACT-02;Restaurants;commerce;495;241;155;99;PDC tableau 20
+ACT-99;Cantines / magasins;commerce;1134;;;;PDC tableau 20 — non ventilé
+ACT-03;Dibiteries;commerce;21;;;;PDC tableau 20 — non ventilé
+ACT-05;Stations d'essence;commerce;9;;;;PDC tableau 20 — non ventilé
+ACT-04;Grandes surfaces / supérettes;commerce;6;;;;PDC tableau 20 — non ventilé
+ACT-12;Ateliers tailleur / couture;artisanat;1285;966;150;169;PDC tableau 22
+ACT-99;Ventes diverses;artisanat;813;589;98;126;PDC tableau 22
+ACT-19;Dépôts;artisanat;139;112;18;9;PDC tableau 22
+ACT-13;Salons de coiffure;artisanat;152;31;75;46;PDC tableau 22
+ACT-15;Quincailleries;artisanat;103;46;38;19;PDC tableau 22
+ACT-18;Boutiques cosmétiques;artisanat;96;24;23;49;PDC tableau 22
+ACT-10;Menuiseries bois;artisanat;82;;;;PDC tableau 22 — non ventilé
+ACT-17;Pressing;artisanat;59;31;11;17;PDC tableau 22
+ACT-07;Cordonneries;artisanat;68;;;;PDC tableau 22 — non ventilé
+ACT-09;Garages mécaniques;artisanat;47;;;;PDC tableau 22 — non ventilé
+ACT-16;Merceries;artisanat;42;28;7;7;PDC tableau 22
+ACT-08;Forgeries;artisanat;23;;;;PDC tableau 22 — non ventilé
+ACT-06;Bijouteries;artisanat;28;;;;PDC tableau 22 — non ventilé
+ACT-11;Ateliers vulcanisation;artisanat;11;;;;PDC tableau 22 — non ventilé
+ACT-14;Boulangeries pâtisseries;artisanat;9;;;;PDC tableau 22 — non ventilé
