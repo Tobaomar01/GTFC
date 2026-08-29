@@ -67,7 +67,7 @@ export function BandeauEtat() {
 // ===========================================================================
 //  Relevé de position
 // ===========================================================================
-export function ReleveurPosition({ position, onPosition, obligatoire = true, urlTuiles = null }) {
+export function ReleveurPosition({ position, onPosition, obligatoire = true, urlTuiles = null, rues = [] }) {
   const [enCours, setEnCours] = useState(false);
   const [etat, setEtat] = useState(null);
   const [erreur, setErreur] = useState(null);
@@ -142,6 +142,7 @@ export function ReleveurPosition({ position, onPosition, obligatoire = true, url
         <CartePosition
           position={position}
           urlTuiles={urlTuiles}
+          rues={rues}
           onAjuste={(p) => onPosition({ ...position, ...p }, suggestion)}
         />
       ) : null}

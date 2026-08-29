@@ -24,7 +24,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { useApp } from '../contextes/AppContexte';
-import { referentielsComplets } from '../bdd/sync.repo';
+import { referentielsComplets, lireReferentiel } from '../bdd/sync.repo';
 import { creerCommerce, commercesProches } from '../bdd/commerces.repo';
 import { quartiersParProximite } from '../services/localisation';
 import {
@@ -41,6 +41,9 @@ export function RecensementEcran({ navigation }) {
   const [position, setPosition] = useState(null);
   const [quartiers, setQuartiers] = useState([]);
   const [voisins, setVoisins] = useState([]);
+  // Tracés des rues : ce qui permet à l'agent de se repérer sur la carte
+  // tant qu'aucun fond de plan n'est disponible.
+  const [rues, setRues] = useState([]);
 
   const [form, setForm] = useState({
     enseigne: '', categorie_id: null, quartier_id: null,
@@ -55,7 +58,10 @@ export function RecensementEcran({ navigation }) {
   const [erreurs, setErreurs] = useState({});
   const [enregistre, setEnregistre] = useState(false);
 
-  useEffect(() => { referentielsComplets().then(setReferentiels); }, []);
+  useEffect(() => {
+    referentielsComplets().then(setReferentiels);
+    lireReferentiel('rues', []).then(setRues);
+  }, []);
 
   const majForm = (champ, valeur) => {
     setForm((f) => ({ ...f, [champ]: valeur }));
@@ -256,6 +262,7 @@ export function RecensementEcran({ navigation }) {
           position={position}
           onPosition={surPosition}
           urlTuiles={process.env.EXPO_PUBLIC_TUILES_URL ?? null}
+          rues={rues}
         />
 
         {/* ---------------- Doublons potentiels ---------------- */}

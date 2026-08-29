@@ -487,12 +487,23 @@ async function paquetHorsLigne(contexte, { depuis = null, zoneId = null } = {}) 
                              photo_devanture_obligatoire, photo_todp_obligatoire,
                              objectif_visites_jour_agent, encaissement_especes_autorise
                         FROM app.commune_parametre WHERE commune_id = $1`, [contexte.communeId]),
-        // Les rues partent EN ENTIER, sans leur tracé : quelques milliers de
-        // libellés pèsent moins qu'une photo, alors qu'un seul MultiLineString
-        // en pèse davantage. L'agent choisit dans une liste, il n'affiche pas
-        // la voirie.
+        // Les rues partent EN ENTIER, tracé compris.
+        //
+        // Le tracé était autrefois exclu, au motif qu'un MultiLineString pèse
+        // lourd et que l'agent choisissait dans une liste. Depuis que le
+        // recensement se fait sur une carte, il en a besoin : sans fond de
+        // plan — hors ligne, ou tuiles pas encore générées — le dessin des
+        // rues est ce qui lui permet de se repérer et de poser le point au
+        // bon endroit.
+        //
+        // Le coût est mesuré, pas supposé : simplifié à 2 m, le réseau entier
+        // de la commune pèse 22 ko, moins qu'une vignette de photo.
         client.query(`SELECT id, code, nom, quartier_id, zone_id, type_voie, variantes,
-                             statut_couverture
+                             statut_couverture,
+                             CASE WHEN geom IS NULL THEN NULL
+                                  ELSE ST_AsGeoJSON(
+                                         ST_SimplifyPreserveTopology(geom, 0.00002))
+                             END AS trace
                         FROM app.rue
                        WHERE archive_le IS NULL AND actif
                        ORDER BY nom`),

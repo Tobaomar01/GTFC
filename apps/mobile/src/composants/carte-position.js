@@ -54,7 +54,7 @@ function distanceM(a, b) {
   return Math.round(Math.sqrt(dLat * dLat + x * x) * R);
 }
 
-function pageCarte({ longitude, latitude, urlTuiles }) {
+function pageCarte({ longitude, latitude, urlTuiles, rues }) {
   return `<!doctype html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>${LEAFLET_CSS}
@@ -77,6 +77,8 @@ function pageCarte({ longitude, latitude, urlTuiles }) {
   .leaflet-control-zoom a{width:38px;height:38px;line-height:38px;
     font-size:20px;color:#12261A}
   .leaflet-control-attribution{font-size:9px;background:rgba(255,255,255,.7)}
+  .nom-rue{font-size:11px;font-weight:600;background:#fff;border:1px solid #D3DAD2;
+    color:#16211A;padding:2px 6px}
 </style></head><body>
 <div id="c" class="${urlTuiles ? '' : 'sans-fond'}"></div>
 <div class="ancre"></div>
@@ -98,6 +100,30 @@ function pageCarte({ longitude, latitude, urlTuiles }) {
       maxZoom: ${ZOOM_MAX}, maxNativeZoom: 19,
       attribution: 'Commune de Gueule Tapée-Fass-Colobane'
     }).addTo(carte);` : ''}
+
+  // Le dessin des rues, que la commune possède.
+  //
+  // Sans fond de plan — hors ligne, ou tuiles pas encore générées — c'est ce
+  // qui permet à l'agent de se repérer : il reconnaît sa rue et
+  // l'intersection la plus proche, et pose le point en connaissance de
+  // cause. Une grille abstraite ne lui apprendrait rien.
+  var rues = ${rues};
+  if (rues && rues.length) {
+    var couche = L.geoJSON(
+      { type: 'FeatureCollection', features: rues },
+      {
+        style: { color: '#4A6FA5', weight: 3, opacity: .75 },
+        onEachFeature: function (f, l) {
+          if (f.properties && f.properties.nom) {
+            l.bindTooltip(f.properties.nom, {
+              permanent: false, direction: 'top', className: 'nom-rue'
+            });
+          }
+        }
+      }
+    ).addTo(carte);
+    couche.bringToBack();
+  }
 
   // Position d'origine du GPS, gardée en repère : l'agent voit d'où il
   // part et de combien il s'écarte.
@@ -122,15 +148,28 @@ function pageCarte({ longitude, latitude, urlTuiles }) {
 </script></body></html>`;
 }
 
-export default function CartePosition({ position, urlTuiles = null, onAjuste }) {
+export default function CartePosition({ position, urlTuiles = null, rues = [], onAjuste }) {
   const [courante, setCourante] = useState(null);
   const [prete, setPrete] = useState(false);
   const vue = useRef(null);
   const depart = useRef({ longitude: position.longitude, latitude: position.latitude });
 
+  // Les rues arrivent du référentiel hors ligne, avec leur tracé simplifié.
+  // On ne garde que celles qui en ont un : une rue sans géométrie — ajoutée
+  // d'après le PDC, jamais relevée — n'a rien à dessiner.
+  const traces = useMemo(() => JSON.stringify(
+    (rues ?? [])
+      .filter((r) => r.trace)
+      .map((r) => ({
+        type: 'Feature',
+        geometry: typeof r.trace === 'string' ? JSON.parse(r.trace) : r.trace,
+        properties: { nom: r.nom },
+      })),
+  ), [rues]);
+
   const html = useMemo(
-    () => pageCarte({ ...depart.current, urlTuiles }),
-    [urlTuiles],
+    () => pageCarte({ ...depart.current, urlTuiles, rues: traces }),
+    [urlTuiles, traces],
   );
 
   const surMessage = useCallback((evenement) => {
@@ -190,8 +229,8 @@ export default function CartePosition({ position, urlTuiles = null, onAjuste }) 
       <Text style={[typographie.petit, styles.aide]}>
         {urlTuiles
           ? 'Faites glisser la carte pour amener le repère sur la boutique.'
-          : "Fond de carte indisponible hors ligne. Le repère reste déplaçable : "
-            + 'ajustez-le si vous savez que la position est décalée.'}
+          : 'Pas de fond de plan, mais le tracé des rues est affiché. '
+            + 'Repérez-vous dessus et amenez le repère sur la boutique.'}
       </Text>
 
       {deplace ? (
