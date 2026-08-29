@@ -68,14 +68,20 @@ fi
 TARGET="${BACKUP_DIR}/daily/${DUMP_NAME}"
 log "Dump vers ${TARGET}"
 
+# Une sauvegarde interrompue laisse un fichier sur le disque. Il porte un nom
+# de sauvegarde, il est daté, il figure dans le dossier — et il est vide ou
+# tronqué. C'est le pire cas de tous : on croit avoir une sauvegarde. On
+# l'efface donc avant de renoncer, plutôt que de la laisser rassurer.
+nettoyer_partiel() { rm -f "$TARGET"; }
+
 docker exec -e PGPASSWORD="$DB_SUPERUSER_PASSWORD" "$CONTAINER" \
     pg_dump -U "$DB_SUPERUSER" -d "$DB_NAME" \
         --format=custom --compress=6 --verbose --no-owner --no-privileges \
     > "$TARGET" 2>>"$LOG_FILE" \
-    || fail "pg_dump a échoué."
+    || { nettoyer_partiel; fail "pg_dump a échoué."; }
 
 SIZE_MB=$(du -m "$TARGET" | cut -f1)
-[[ "$SIZE_MB" -gt 0 ]] || fail "Le fichier de sauvegarde est vide."
+[[ "$SIZE_MB" -gt 0 ]] || { nettoyer_partiel; fail "Le fichier de sauvegarde est vide."; }
 log "Dump terminé — ${SIZE_MB} Mo"
 
 # --- 4. Contrôle d'intégrité ------------------------------------------------
