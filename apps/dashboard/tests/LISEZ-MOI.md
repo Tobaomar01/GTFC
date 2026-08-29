@@ -50,3 +50,24 @@ Ceux du jeu de démonstration, mot de passe `GtfcDemo2026!` :
 
 En cas d'échec, une capture d'écran et une trace sont écrites dans
 `test-results/`. La trace s'ouvre avec `npx playwright show-trace`.
+
+## Le portail du redevable
+
+`portail.spec.js` éprouve les deux surfaces qu'un commerçant — ou un passant —
+atteint sans qu'aucun agent ne soit présent.
+
+Ce qui y est vérifié n'est pas que le portail « marche », mais qu'il **ne
+s'ouvre pas quand il ne devrait pas** : un numéro inconnu reçoit exactement la
+même réponse qu'un numéro connu, un code faux n'ouvre rien, et l'adresse du
+dossier ne suffit pas sans session.
+
+Le portail exige un numéro VÉRIFIÉ par un agent. Le jeu de démonstration n'en
+comptait aucun, si bien que la fonctionnalité entière restait derrière une
+porte que rien n'ouvrait — le seed 0014 en vérifie cinq.
+
+Pour la page publique d'un sticker, fournir un jeton :
+
+```bash
+QR_JETON=$(psql -q gtfc_recette -At -c "SELECT jeton FROM app.qr_code WHERE actif LIMIT 1") \
+  npx playwright test
+```

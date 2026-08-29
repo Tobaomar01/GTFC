@@ -171,7 +171,11 @@ router.post('/code', limiteConnexion, valider(z.object({
   return ok(res, {
     ...reponse,
     expire_le: envoi.expire_le,
-    ...(envoi.code ? {
+    // Deuxième verrou. La configuration refuse déjà de démarrer en production
+    // sans passerelle SMS ; si elle a été forcée malgré tout, le code ne doit
+    // pas pour autant transiter dans la réponse — le lire suffirait à ouvrir
+    // le dossier de n'importe quel commerçant dont on connaît le numéro.
+    ...(envoi.code && !config.production ? {
       code_simule: envoi.code,
       avertissement: 'Aucun opérateur SMS raccordé : code affiché pour les essais uniquement.',
     } : {}),

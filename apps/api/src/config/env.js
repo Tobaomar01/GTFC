@@ -155,6 +155,10 @@ const config = {
     // SMS_BASE_URL, SMS_API_KEY, SMS_ACTIF=true. Aucun code ne change.
     fournisseur: optionnel('SMS_FOURNISSEUR', ''),
     actif: booleen('SMS_ACTIF', false) && Boolean(optionnel('SMS_FOURNISSEUR', '')),
+    // Autoriser explicitement la SIMULATION en production. Sans elle, l'API
+    // refuse de démarrer : voir le contrôle plus bas, et le commentaire de
+    // sms.service.js qui l'annonçait depuis le début.
+    simulerEnProduction: booleen('SMS_SIMULER_EN_PROD', false),
     expediteur: optionnel('SMS_EXPEDITEUR', 'MAIRIE'),
     baseUrl: optionnel('SMS_BASE_URL', ''),
     apiKey: optionnel('SMS_API_KEY', ''),
@@ -188,6 +192,20 @@ if (config.production && config.serveur.corsOrigines.length === 0) {
 if (config.sms.actif && !config.sms.baseUrl) {
   erreurs.push('SMS_BASE_URL est obligatoire dès que SMS_ACTIF=true : '
     + 'sans URL de passerelle, aucun code d\'accès ne peut partir');
+}
+// Sans passerelle SMS, le code à usage unique est SIMULÉ : il est écrit dans
+// le journal, et le portail le renvoie dans sa réponse HTTP pour permettre les
+// essais. En production, cela signifie que quiconque connaît le numéro d'un
+// commerçant peut demander un code, le lire dans la réponse, et ouvrir son
+// dossier fiscal — montants dus, historique, adresse.
+//
+// SMS_ACTIF vaut faux par défaut. L'oubli est donc le cas le plus probable, et
+// son coût est une usurpation d'identité silencieuse. On refuse de démarrer.
+if (config.production && !config.sms.actif && !config.sms.simulerEnProduction) {
+  erreurs.push('SMS_ACTIF=false en production : le code à usage unique serait '
+    + 'renvoyé en clair dans la réponse HTTP, et n\'importe qui pourrait ouvrir '
+    + 'le dossier d\'un redevable en connaissant son numéro. Raccordez une '
+    + 'passerelle SMS, ou posez SMS_SIMULER_EN_PROD=true en connaissance de cause.');
 }
 if (config.wave.actif && !config.wave.webhookSecret) {
   erreurs.push('WAVE_WEBHOOK_SECRET est obligatoire dès que WAVE_ACTIF=true : '
