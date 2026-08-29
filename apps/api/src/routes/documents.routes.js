@@ -249,6 +249,26 @@ router.get('/notifications/a-transmettre',
     });
   }));
 
+/**
+ * Vide la file d'attente maintenant.
+ *
+ * Le planificateur s'en charge tous les quarts d'heure, ce qui suffit au
+ * rythme ordinaire. Mais celui qui vient de lancer une campagne veut voir
+ * partir les messages, et savoir tout de suite si quelque chose bloque : sans
+ * cette route, il attendait sans rien pouvoir observer, et un défaut de
+ * passerelle ne se serait manifesté qu'un quart d'heure plus tard, dans un
+ * journal.
+ *
+ * Idempotente : la file ne contient que ce qui n'est pas encore parti.
+ */
+router.post('/notifications/traiter',
+  exigerRole('admin_commune'),
+  valider(z.object({ limite: z.coerce.number().int().min(1).max(500).default(100) }), 'body'),
+  asyncHandler(async (req, res) => {
+    const bilan = await notifications.traiterFile(req.contexte, { limite: req.body.limite });
+    return ok(res, bilan);
+  }));
+
 router.post('/notifications/remis',
   valider(z.object({ ids: z.array(uuid).min(1).max(500) })),
   asyncHandler(async (req, res) => {

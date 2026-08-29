@@ -23,6 +23,7 @@
 const config = require('../config/env');
 const logger = require('../config/logger');
 const { requete } = require('../config/database');
+const sms = require('./sms.service');
 
 /** Un SMS fait 160 caractères. Au-delà il est facturé double, et tronqué par
  *  certains opérateurs : on compose donc court, et on vérifie. */
@@ -68,15 +69,28 @@ const CANAUX = {
     return { statut: 'envoye' };
   },
 
+  /**
+   * Envoi réel, par la passerelle de l'opérateur.
+   *
+   * Ce canal levait « Fournisseur SMS déclaré mais non implémenté », alors que
+   * l'envoi existait déjà, complet, dans sms.service.js — avec deux pilotes.
+   * Deux modules parlaient du même sujet, l'un abouti, l'autre resté à
+   * l'état d'intention ; et c'est celui-ci que la file appelle.
+   *
+   * Rien ne pouvait le voir tant qu'aucune passerelle n'était raccordée : sans
+   * elle, `config.sms.actif` est faux et le message repart en file. Le jour du
+   * branchement, la campagne mensuelle aurait échoué sur CHAQUE message — et
+   * avec elle le seul canal par lequel l'argent rentre.
+   */
   async sms(notification) {
     if (!config.sms?.actif) {
       // Aucun opérateur configuré : on ne perd pas le message, on le laisse
       // en file plutôt que de le marquer en échec.
       return { statut: 'en_attente', message: 'Aucun fournisseur SMS configuré' };
     }
-    // Emplacement de l'intégration : Orange SMS API, Twilio, ou passerelle
-    // locale. Une seule fonction à écrire ici le moment venu.
-    throw new Error('Fournisseur SMS déclaré mais non implémenté');
+
+    const { reference } = await sms.envoyer(notification.destinataire, notification.contenu);
+    return { statut: 'envoye', reference };
   },
 };
 
