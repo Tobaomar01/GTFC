@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../contextes/AppContexte';
 import { Bouton, Champ, Message } from '../composants/ui';
 import { couleurs, espacements, typographie, rayons } from '../theme';
-import { api } from '../api/client';
+import { api, PROBLEME_ADRESSE_API } from '../api/client';
 
 export function ConnexionEcran() {
   const { connecter, connexionFiable } = useApp();
@@ -72,6 +72,15 @@ export function ConnexionEcran() {
           <Text style={styles.titre}>Collecte des taxes locales</Text>
           <Text style={styles.sousTitre}>Application des agents de terrain</Text>
         </View>
+
+        {/* Dit AVANT la connexion, pas après une journée de recensement
+            perdue : un APK sans son adresse de serveur laisse croire à une
+            panne de réseau alors que le réseau va très bien. */}
+        {PROBLEME_ADRESSE_API ? (
+          <Message type="erreur" titre="Cet APK n'est pas prêt pour le terrain">
+            {PROBLEME_ADRESSE_API}
+          </Message>
+        ) : null}
 
         <View style={styles.formulaire}>
           {!connexionFiable ? (

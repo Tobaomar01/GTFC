@@ -21,6 +21,30 @@ const URL_API = process.env.EXPO_PUBLIC_API_URL
   || Constants.expoConfig?.extra?.apiUrl
   || 'https://api.exemple.sn';
 
+/**
+ * Adresses de remplissage : celles qu'on écrit en attendant la vraie.
+ *
+ * Un APK construit avec le mauvais profil emporte l'une d'elles et part sur le
+ * terrain. L'agent recense sa journée, la synchronisation échoue à chaque
+ * tentative, et le message qu'il voit parle de réseau — alors que le réseau va
+ * très bien : c'est l'adresse qui ne mène nulle part. Il rentrera en pensant
+ * que le serveur est tombé.
+ *
+ * On préfère le dire au démarrage, en clair, à qui installe l'application.
+ */
+const ADRESSES_DE_REMPLISSAGE = [/A_REMPLIR/i, /exemple\.sn/i, /example\./i];
+
+export const adresseApiValide = (url = URL_API) => Boolean(url)
+  && !ADRESSES_DE_REMPLISSAGE.some((m) => m.test(url));
+
+export const PROBLEME_ADRESSE_API = adresseApiValide()
+  ? null
+  : `L'application pointe vers « ${URL_API} », qui n'est pas une vraie adresse.`
+    + ' Cet APK a été construit sans son adresse de serveur : il ne pourra rien'
+    + ' synchroniser. Demandez-en un autre avant de partir sur le terrain.';
+
+export const URL_SERVEUR = URL_API;
+
 const DELAI_NORMAL = 20000;
 const DELAI_SYNC = 120000;      // un lot de 100 opérations prend du temps
 const DELAI_PHOTO = 180000;     // 2 Mo en 3G
