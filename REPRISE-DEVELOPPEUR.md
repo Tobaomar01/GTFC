@@ -1,34 +1,18 @@
-# Reprise du projet sur une autre machine
-
-Ce paquet contient tout ce qui n'est pas déjà sur GitHub : les 31 commits qui
-n'ont pas été poussés, la base de données, et la mémoire de travail de Claude.
-
-Compte : le même que sur la machine d'origine. Rien à créer.
-
----
-
-## Ce que c'est
+# Reprise du projet
 
 Plateforme de collecte des taxes locales pour la commune de **Gueule
 Tapée-Fass-Colobane**, à Dakar. Pilote en partenariat public-privé.
 
-Trois applications et une base :
-
-| | |
-|---|---|
-| `apps/api` | Express, PostgreSQL 17 + PostGIS. 94 tests. |
-| `apps/dashboard` | Next.js. 12 pages, 13 tests de navigateur. |
-| `apps/mobile` | Expo / React Native. Compile ; jamais installée sur un téléphone. |
-| `db/` | 59 migrations, 13 seeds. Installation depuis une base vide vérifiée. |
-
-Le dépôt d'origine est `github.com/Tobaomar01/GTFC`. **`master` n'a pas été
-touché.** Tout le travail est sur la branche `conformite-specification`.
+`master` n'a pas été touché. Tout le travail est sur `conformite-specification`
+— **40 commits**.
 
 ---
 
-## Transfert, dans l'ordre
+## 1. Transférer
 
-### 1. Le code
+Le paquet `transfert/` contient ce qui n'est pas sur GitHub.
+
+### Le code
 
 ```bash
 git clone https://github.com/Tobaomar01/GTFC.git ~/revenu-municipal/code-existant
@@ -39,24 +23,19 @@ git fetch /chemin/vers/code/gtfc-conformite-specification.bundle \
 git checkout conformite-specification
 ```
 
-Un *bundle* plutôt qu'un `git push` : pousser 31 commits sur un dépôt partagé
-est visible par tout le monde, et cette décision revient au propriétaire du
-dépôt, pas à moi. Le bundle transporte exactement les mêmes commits, signés de
-la même façon, et vous poussez quand vous le jugez bon.
+Un *bundle* plutôt qu'un `git push` : pousser 40 commits sur un dépôt partagé
+est visible par tout le monde, et cette décision revient à son propriétaire.
+Le bundle porte exactement les mêmes commits ; vous poussez quand vous voulez.
 
-### 2. Les dépendances
+### Les dépendances, la base
 
 ```bash
-cd apps/api       && npm install
-cd ../dashboard   && npm install
-cd ../mobile      && npm install
+cd apps/api && npm install && cd ../dashboard && npm install && cd ../mobile && npm install
 ```
 
-### 3. La base
-
-Il faut **PostgreSQL 17** et **PostGIS**. La version 16 ne suffit pas : elle
-refuse de lire ce fichier, et son `pg_dump` produit silencieusement un fichier
-de zéro octet.
+**PostgreSQL 17 et PostGIS.** La version 16 ne suffit pas : elle refuse de
+lire ce fichier, et son `pg_dump` produit un fichier de zéro octet sans le
+dire.
 
 ```bash
 createdb gtfc_recette
@@ -66,154 +45,172 @@ psql gtfc_recette -c "CREATE EXTENSION postgis; CREATE EXTENSION pgcrypto;
 pg_restore -d gtfc_recette --no-owner --no-privileges base/gtfc.dump
 ```
 
-Vérifiez l'empreinte avant : `shasum -a 256 base/gtfc.dump` doit correspondre
-à `base/gtfc.dump.sha256`.
+Vérifiez l'empreinte avant : `shasum -a 256 base/gtfc.dump`.
 
-Puis contrôlez que tout est arrivé :
+### Les secrets
 
-```bash
-bash scripts/exercice-restauration.sh gtfc_recette
-```
+**Absents du paquet, délibérément.** `code/variables-a-renseigner.txt` liste
+les 63 noms, sans valeur. Copiez `.env.template` en `.env`.
 
-### 4. Les secrets
+### La mémoire de Claude
 
-**Ils ne sont pas dans ce paquet, et c'est délibéré.** Le fichier `.env` est
-ignoré par git et n'a pas à voyager dans une archive.
-
-`code/variables-a-renseigner.txt` liste les 63 noms de variables, sans aucune
-valeur. Copiez `.env.template` en `.env` et remplissez-le — pour un poste de
-développement, les valeurs locales suffisent, sauf `WAVE_WEBHOOK_SECRET` que
-les tests de paiement utilisent (n'importe quelle chaîne fait l'affaire en
-local).
-
-### 5. La mémoire de Claude
-
-C'est le point qu'on oublie. Sans elle, une nouvelle session ne sait rien des
-décisions prises ni de leurs motifs, et refera les mêmes erreurs.
+C'est ce qu'on oublie. Sans elle, une nouvelle session ignore les décisions
+prises et leurs motifs.
 
 ```bash
 mkdir -p ~/.claude/projects/-Users-momar-revenu-municipal/memory
 cp memoire/*.md ~/.claude/projects/-Users-momar-revenu-municipal/memory/
 ```
 
-Le nom du dossier encode le chemin du projet. Si vous travaillez ailleurs que
-dans `~/revenu-municipal`, adaptez-le : les tirets remplacent les barres
-obliques.
-
-Cinq fichiers, dont un index `MEMORY.md` chargé à chaque session. Ils portent
-notamment pourquoi il n'y a pas d'espèces, pourquoi les agents ne sont pas
-géolocalisés, et qui valide une remise de dette.
+Le nom du dossier encode le chemin du projet ; adaptez-le si vous travaillez
+ailleurs (les tirets remplacent les barres obliques).
 
 ---
 
-## Vérifier que la reprise a réussi
+## 2. Vérifier que la reprise a réussi
+
+Cinq commandes. Les cinq doivent passer.
 
 ```bash
-# 1. L'installation depuis une base vide, puis les 94 tests
+# Installation depuis une base vide, puis les 122 tests
 bash scripts/verifier-installation-neuve.sh gtfc_epreuve
 
-# 1 bis. La recette fonctionnelle et les pages du tableau de bord
-#        (exigent l'API sur 4000 et le tableau de bord sur 3000)
+# Le métier, contre l'API locale (API sur 4000, dashboard sur 3000)
 DB_NAME=gtfc_recette RECETTE_MDP='GtfcDemo2026!' bash scripts/recette.sh
-cd apps/dashboard && npm test
 
-# 2. Le tableau de bord compile
-cd apps/dashboard && npx next build
+# La chaîne entière EN CONDITIONS DE PRODUCTION, passerelle SMS factice
+bash scripts/repetition-generale.sh gtfc_recette
 
-# 3. L'application mobile compile en entier
-cd apps/mobile && npx expo export --platform android --output-dir .export-verif
+# Les douze tâches automatiques
+cd apps/api && DB_NAME=gtfc_recette node src/scheduler.js --une-fois
 
-# 4. Les défauts que les tests ne voient pas
+# Les défauts qu'aucun test ne voit — la sortie doit être VIDE
 npx eslint@9 --config eslint.defauts.mjs \
   apps/api/src apps/api/scripts apps/api/tests \
   apps/dashboard/src apps/mobile/src apps/mobile/outils
 ```
 
-Les quatre doivent passer. La quatrième doit être **silencieuse** : un
-avertissement laissé traîner enterre celui qui viendra ensuite.
+Plus, avec un navigateur : `cd apps/dashboard && npm test` (18 tests).
 
 ---
 
-## Où en est le projet
+## 3. Ce qu'il faut savoir avant de lire le code
 
-### Fait et vérifié
+**Les défauts de ce projet ne sont pas dans le code, ils sont aux jointures.**
+Une dizaine ont été trouvés en une journée. Aucun n'était visible à la
+lecture ; tous l'ont été en exécutant quelque chose pour la première fois.
 
-- Base : 59 migrations, installation neuve éprouvée, sauvegarde restaurée,
-  chaîne d'audit intacte après restauration.
-- API : 94 tests. Les six chemins que la constitution du projet impose
-  d'éprouver sont couverts — idempotence des paiements, imputation,
-  rapprochement opérateur, synchronisation hors ligne, limites du code à usage
-  unique, chaînage du journal d'audit.
-- Référentiel de 100 rues, dont 85 extraites d'OpenStreetMap avec leur tracé.
-- Rôles et séparation des pouvoirs : le chef de projet instruit une remise de
-  dette, le maire la valide. Aucun des deux ne peut la conclure seul.
+Trois formes reviennent, et elles reviendront :
 
-- Tableau de bord : les douze pages s'ouvrent dans un vrai navigateur et
-  portent leurs données. Deux d'entre elles ne fonctionnaient pas.
-- Recette fonctionnelle : 31 contrôles au vert, sur un poste sans serveur.
+**Deux modules corrects qui se rencontrent mal.** La passerelle SMS refusait
+tout message contenant un montant ; les trois modèles en annonçaient un.
+Chacun juste isolément. Ensemble : aucun SMS ne serait jamais parti — et c'est
+le seul canal de recouvrement.
 
-### Ce qui reste à coder
+**Un chemin de repli qui masque le vrai chemin.** Sans passerelle raccordée et
+hors mode production, le système emprunte des routes qui n'existeront pas le
+jour venu. Le code à usage unique renvoyé en clair dans la réponse HTTP, le
+canal de notification resté à l'état d'intention : invisibles jusqu'au
+branchement de l'opérateur.
 
-Rien de bloquant. Les surfaces principales sont éprouvées. Ce qui manque
-encore de tests : les sept écrans mobiles au-delà des fonctions pures, les
-contestations de bout en bout, et le portail redevable côté navigateur.
+**Un commentaire qui décrit une protection absente.** « Ce mode refuse de
+s'activer en production sans `SMS_SIMULER_EN_PROD` » — cette variable
+n'existait nulle part ailleurs que dans cette phrase. Pire qu'un silence : il
+rassure le relecteur. Je l'ai lu deux fois avant de vérifier.
 
-### Ce qui est bloqué ailleurs
+### Les dix commits à lire en premier
+
+Chaque message explique le défaut, pourquoi il était invisible, et ce qu'il
+aurait coûté. C'est le plus court chemin vers l'état d'esprit du projet.
+
+| | |
+|---|---|
+| `3dc6d10` | Le système se serait arrêté le 1er mars, d'un coup |
+| `d52b6b5` | Aucun SMS ne serait jamais parti |
+| `0d8d6cc` | Le code à usage unique partait dans la réponse HTTP |
+| `4308d0f` | La répétition générale, et la troisième rupture du même chemin |
+| `cf92bb7` | Trois routes échouaient à chaque appel, pour la même raison |
+| `57cfe1c` | Deux pages du tableau de bord n'avaient jamais fonctionné |
+| `c8dc053` | Le maire, le chef de projet, et une chaîne d'audit qui criait au loup |
+| `049a43b` | Des seeds muets, et des tests vrais par vacuité |
+| `c62361a` | L'adresse d'un passant n'a pas à rester |
+| `d1e7379` | Éprouver l'installation neuve, et réparer ce qu'elle a trouvé |
+
+---
+
+## 4. Les décisions du commanditaire, et leurs motifs
+
+Elles ne se déduisent pas du code. Les défaire serait une erreur.
+
+**Zéro espèce, Wave uniquement.** « C'est dans la collecte que réside le
+risque de vol par les agents. » Ni virement, ni chèque, ni compensation.
+
+**Aucun suivi de position des agents.** Écarté explicitement. Les seules
+positions enregistrées sont celles rattachées à une intervention.
+
+**Liquidation annuelle, solde restant dû.** Le redevable paie à son rythme ;
+le mensuel n'est qu'un repère indicatif, jamais un calendrier imposé.
+
+**Deux organisations.** Côté exploitant, le `chef_projet` voit tout le
+dispositif et INSTRUIT les décisions dérogatoires. Côté municipalité, le
+`maire` les VALIDE — c'est sa seule écriture engageant la commune. Aucune des
+deux parties ne peut effacer une dette à elle seule : remettre une dette
+publique est un acte de la commune, et la constitution du projet interdit à
+l'exploitant tout droit sur les échéances.
+
+**Le dépôt d'une contestation ne suspend pas le recouvrement.** Sinon
+contester deviendrait un moyen de ne pas payer.
+
+---
+
+## 5. Où en est le projet
+
+### Éprouvé
+
+122 tests API · 18 tests de navigateur · 12 contrôles de répétition générale ·
+31 contrôles de recette · installation depuis une base vide · sauvegarde
+restaurée, chaîne d'audit intacte après restauration · douze tâches
+automatiques exécutées.
+
+Les six chemins que la constitution impose d'éprouver sont couverts.
+
+### Jamais ouvert — c'est là que sont les prochains défauts
+
+- **Les sept écrans mobiles.** Jamais affichés. Seules les fonctions pures
+  sont testées. **C'est le plus grand angle mort**, et Expo Go permet d'y voir
+  en cinq minutes : voir `apps/mobile/TESTER-SANS-SERVEUR.md`.
+- **Six familles d'appels** : `/zones`, `/quartiers`, `/categories`,
+  `/quittances/:id/pdf`, `/impression/stickers`, `/campagnes/lien/:avisId`.
+  Les planches de stickers sont ce que l'agent colle le premier jour.
+- **MinIO en conditions réelles.**
+- **Les huit scripts de déploiement.**
+- **L'exercice de réversibilité** que la constitution exige. La restauration
+  est faite ; sortir la commune du dispositif ne l'est pas.
+
+### Bloqué ailleurs
 
 | | Qui |
 |---|---|
-| 188 données provisoires : 100 noms de rue, 65 lignes de barème, 15 quartiers | la mairie, par délibération |
+| 188 données provisoires : 100 rues, 65 lignes de barème, 15 quartiers | la mairie, par délibération |
 | Code court USSD | les opérateurs |
 | Compte marchand Wave | la commune |
 | Déclaration CDP | la commune |
 | Serveur au Sénégal, domaine, certificat | la commune |
+| Compte Expo pour compiler l'APK | le développeur |
 
-La liste des données provisoires se lit directement :
-`SELECT * FROM app.v_donnees_a_remplacer;`
+`SELECT * FROM app.v_donnees_a_remplacer;` donne la liste à porter en réunion.
 
 Aucun de ces blocages n'empêche de tester le **recensement** sur le terrain :
 il ne dépend ni des tarifs, ni de Wave, ni de l'USSD.
 
 ---
 
-## Trois pièges rencontrés, à ne pas retrouver
+## 6. Ce que je recommanderais en premier
 
-**`pg_dump` en version 16 sur un serveur 17** produit un fichier de zéro
-octet. Il porte un nom de sauvegarde, il est daté, il est dans le bon dossier.
-C'est le pire cas de tous : on croit avoir une sauvegarde. Le script de
-sauvegarde efface maintenant les fichiers partiels.
+**Faire relire ces 40 commits.** J'ai modifié le schéma, les règles
+d'habilitation, la passerelle SMS. Chaque décision est motivée dans son
+message, la branche est séparée — mais une relecture humaine doit venir avant
+le terrain, pas après.
 
-**La chaîne du journal d'audit ne résistait pas aux écritures simultanées.**
-Trois défauts empilés, dont le dernier était subtil : `nextval` est évalué
-avant le déclencheur, donc l'identifiant suit l'ordre d'arrivée des
-transactions et non celui du chaînage. Le journal porte maintenant son propre
-rang. Sur le terrain, l'alarme anti-fraude se serait déclenchée tous les jours
-sans raison — jusqu'à ce que plus personne ne la regarde.
-
-**Les seeds muets.** Un seed qui ne trouve rien à faire se termine sans
-erreur, exactement comme un seed qui a réussi. Les chantiers sont restés à
-zéro pendant des semaines. Le contrôle d'installation vérifie désormais que
-seize tables ne sont pas vides, et échoue sinon.
-
----
-
-## Le vrai risque
-
-Rien de ce qui précède. **Le recensement n'a jamais été fait par un agent réel
-sur une vraie devanture.** Tout a été éprouvé contre 60 commerces de
-démonstration aux positions inventées — c'est pourquoi 51 d'entre eux ne se
-rattachent à aucune rue.
-
-Une demi-journée de terrain sur une seule rue, avec un vrai téléphone,
-apprendra plus que n'importe quel test écrit d'ici.
-
----
-
-## Éprouver l'application sur un téléphone, dès maintenant
-
-Le recensement ne dépend ni des tarifs, ni de Wave, ni de l'USSD : il se teste
-avant que le serveur n'existe, contre l'API du poste, par le Wi-Fi.
-
-Voir `apps/mobile/TESTER-SANS-SERVEUR.md`. Deux voies : Expo Go en cinq
-minutes sans rien installer, ou un APK autonome qui demande un compte Expo
-gratuit.
+Puis ouvrir l'application mobile sur un vrai téléphone. C'est gratuit,
+immédiat, et c'est la seule chose qu'aucun test écrit d'ici ne remplace.
