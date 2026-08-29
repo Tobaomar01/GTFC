@@ -65,7 +65,9 @@ async function situationParTelephone(contexte, telephone) {
          LIMIT 1
       ) a ON true
      WHERE r.telephone = $1
-       AND r.telephone_verifie
+       -- GTFC modélise la vérification par un statut daté et attribué,
+       -- plus riche qu'un booléen : on s'y conforme (FR-005c).
+       AND r.statut_telephone = 'verifie'
        AND r.archive_le IS NULL`, [telephone]);
   return rows[0] ?? null;
 }

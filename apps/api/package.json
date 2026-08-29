@@ -15,7 +15,8 @@
     "scheduler": "node src/scheduler.js",
     "creer-utilisateur": "node scripts/creer-utilisateur.js",
     "verifier-config": "node scripts/verifier-config.js",
-    "test": "node --test tests/"
+    "test": "node --test $(find tests -name '*.test.js')",
+    "test:recette": "DATABASE_URL=${DATABASE_URL_TEST:-postgres://localhost/gtfc_recette} node --test $(find tests -name '*.test.js')"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.658.0",
