@@ -30,8 +30,26 @@ const config = require('../config/env');
 const logger = require('../config/logger');
 
 /** Motifs interdits dans un SMS sortant. */
+/**
+ * Ce qu'un SMS ne doit jamais porter.
+ *
+ * Le MONTANT y figurait, et cette règle rendait le dispositif inerte : les
+ * trois modèles de message annoncent une somme, donc chacun était refusé. Tant
+ * que la passerelle restait débranchée, rien ne s'en apercevait — le canal
+ * bascule alors sur « à transmettre par l'agent », qui n'appelle pas ce
+ * contrôle. Le jour du raccordement, plus aucun SMS ne serait parti, et le
+ * lien Wave avec eux : personne n'aurait su quoi payer ni comment.
+ *
+ * Le montant a donc été retiré de cette liste, après réflexion sur ce qu'elle
+ * protège. Le message part sur le numéro VÉRIFIÉ du redevable, et lui annonce
+ * SA dette : ce n'est pas une fuite, c'est l'objet même de l'envoi. Un avis
+ * qui tairait la somme n'apprendrait rien à personne.
+ *
+ * Restent les identifiants INTERNES. Eux n'apprennent rien au destinataire et
+ * servent à qui les intercepte : une référence d'avis ou un identifiant
+ * technique dans un SMS est une prise, sans contrepartie.
+ */
 const FUITES = [
-  { motif: /\bFCFA\b|\bXOF\b/i, quoi: 'un montant' },
   { motif: /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i, quoi: 'un identifiant interne' },
   { motif: /\b[A-Z]{2,6}-\d{4}-\d{2}-\d{6}\b/, quoi: "un numéro d'avis" },
 ];
