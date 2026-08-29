@@ -149,7 +149,8 @@ export function ReleveurPosition({ position, onPosition, obligatoire = true, url
 
       {enCours && etat ? (
         <Text style={[typographie.petit, { marginTop: espacements.s }]}>
-          Précision actuelle : {etat.precision ? `${Math.round(etat.precision)} m` : 'recherche…'}
+          {etat.mesures ? `${etat.mesures} mesure${etat.mesures > 1 ? 's' : ''} — ` : ''}
+          précision {etat.precision ? `${Math.round(etat.precision)} m` : 'en recherche…'}
           {etat.precision > PRECISION_ACCEPTABLE_M
             && ' — patientez ou avancez de quelques pas'}
         </Text>

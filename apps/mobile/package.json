@@ -10,7 +10,8 @@
     "verifier": "expo-doctor && expo install --check",
     "build:apk": "eas build --platform android --profile preview",
     "build:production": "eas build --platform android --profile production",
-    "test:schema": "node outils/verifier-schema.js"
+    "test:schema": "node outils/verifier-schema.js",
+    "test": "node --test $(find tests -name '*.test.js')"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",

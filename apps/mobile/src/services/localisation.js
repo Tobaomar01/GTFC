@@ -51,16 +51,109 @@ export async function serviceActif() {
   return Location.hasServicesEnabledAsync();
 }
 
+/** Distance approximative entre deux points, en mètres. */
+function distanceM(a, b) {
+  const R = 6371000;
+  const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
+  const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
+  const lat = ((a.latitude + b.latitude) / 2) * (Math.PI / 180);
+  const x = dLon * Math.cos(lat);
+  return Math.sqrt(dLat * dLat + x * x) * R;
+}
+
 /**
- * Relève une position en cherchant la meilleure précision possible.
+ * Agrège des mesures en une position.
  *
- * Le premier point renvoyé par Android est souvent issu du réseau mobile et
- * précis à 500 m. On prend donc plusieurs mesures et on garde la meilleure,
- * en s'arrêtant dès qu'elle est satisfaisante.
+ * Écarte les aberrantes, pondère par la précision annoncée, et retourne
+ * comme précision la DISPERSION réellement observée.
+ */
+export function agreger(mesures) {
+  if (mesures.length === 0) return null;
+  if (mesures.length === 1) {
+    const m = mesures[0];
+    return {
+      longitude: m.longitude, latitude: m.latitude,
+      precision_gps_m: m.precision, nb_mesures: 1,
+      origine: 'satellite', releve_le: m.releve_le,
+    };
+  }
+
+  // Médiane comme point de référence : contrairement à la moyenne, une
+  // mesure à 500 m ne la déplace pas.
+  const med = (xs) => {
+    const t = [...xs].sort((a, b) => a - b);
+    const i = Math.floor(t.length / 2);
+    return t.length % 2 ? t[i] : (t[i - 1] + t[i]) / 2;
+  };
+  const centre = {
+    longitude: med(mesures.map((m) => m.longitude)),
+    latitude: med(mesures.map((m) => m.latitude)),
+  };
+
+  // Une mesure à plus de 100 m de la médiane vient du réseau mobile, pas du
+  // GPS. On l'écarte plutôt que de la laisser polluer la moyenne.
+  const retenues = mesures.filter((m) => distanceM(centre, m) <= 100);
+  const utiles = retenues.length >= 2 ? retenues : mesures;
+
+  let sommePoids = 0; let sx = 0; let sy = 0;
+  for (const m of utiles) {
+    const poids = 1 / Math.max(1, m.precision) ** 2;
+    sommePoids += poids;
+    sx += m.longitude * poids;
+    sy += m.latitude * poids;
+  }
+  const moyenne = { longitude: sx / sommePoids, latitude: sy / sommePoids };
+
+  // Dispersion : écart quadratique moyen des mesures au point retenu. C'est
+  // une mesure honnête de ce qu'on sait, là où la précision annoncée par le
+  // capteur est souvent optimiste.
+  const ecarts = utiles.map((m) => distanceM(moyenne, m));
+  const dispersion = Math.sqrt(
+    ecarts.reduce((s, e) => s + e * e, 0) / ecarts.length);
+
+  // On ne prétend jamais faire mieux que la meilleure mesure annoncée : la
+  // moyenne réduit l'erreur aléatoire, pas le biais commun à toutes.
+  const plancher = Math.min(...utiles.map((m) => m.precision)) / Math.sqrt(utiles.length);
+
+  return {
+    longitude: moyenne.longitude,
+    latitude: moyenne.latitude,
+    precision_gps_m: Math.max(dispersion, plancher, 3),
+    nb_mesures: utiles.length,
+    nb_ecartees: mesures.length - utiles.length,
+    origine: 'satellite',
+    releve_le: utiles[utiles.length - 1].releve_le,
+  };
+}
+
+/**
+ * Relève une position en MOYENNANT plusieurs mesures.
+ *
+ * L'ancienne version gardait la meilleure mesure. C'était insuffisant :
+ * l'erreur GPS est en grande partie aléatoire d'une mesure à l'autre, si
+ * bien qu'une seule mesure — fût-ce la mieux notée — reste dispersée autour
+ * de la vraie position.
+ *
+ * Moyenner N mesures divise l'erreur aléatoire par la racine de N : vingt
+ * mesures la réduisent d'un facteur quatre. Sur un relevé annoncé à 30 m,
+ * cela ramène l'écart réel vers 7 à 8 m — assez pour désigner le bon
+ * bâtiment, à défaut de la bonne devanture.
+ *
+ * Trois précautions rendent la moyenne fiable :
+ *
+ *   · les mesures aberrantes sont écartées. Le premier point renvoyé par
+ *     Android vient souvent du réseau mobile et se trompe de 500 m : le
+ *     moyenner ruinerait tout ;
+ *   · chaque mesure pèse selon sa précision annoncée, une mesure à 5 m
+ *     comptant plus qu'une à 40 m ;
+ *   · la précision retenue est celle de la DISPERSION observée, non celle
+ *     que le capteur annonce. Annoncer 5 m parce qu'on a moyenné, alors que
+ *     les mesures s'étalent sur 30 m, serait mentir à l'agent.
  */
 export async function releverPosition({
   precisionVisee = PRECISION_ACCEPTABLE_M,
-  delaiMaxMs = 15000,
+  delaiMaxMs = 20000,
+  mesuresVisees = 12,
   surProgression = null,
 } = {}) {
   if (!(await autorisationAccordee())) {
@@ -80,43 +173,44 @@ export async function releverPosition({
   }
 
   const debut = Date.now();
-  let meilleure = null;
+  const mesures = [];
 
-  while (Date.now() - debut < delaiMaxMs) {
+  while (Date.now() - debut < delaiMaxMs && mesures.length < mesuresVisees) {
     let position;
     try {
       position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.BestForNavigation,
         mayShowUserSettingsDialog: false,
       });
     } catch {
-      break;   // on sortira avec la meilleure mesure déjà obtenue, s'il y en a
+      break;   // on sortira avec ce qui a déjà été collecté
     }
 
-    const mesure = {
+    mesures.push({
       longitude: position.coords.longitude,
       latitude: position.coords.latitude,
-      precision_gps_m: position.coords.accuracy ?? null,
-      altitude: position.coords.altitude ?? null,
+      precision: position.coords.accuracy ?? 9999,
       releve_le: new Date(position.timestamp).toISOString(),
-    };
+    });
 
-    if (!meilleure || (mesure.precision_gps_m ?? 9999) < (meilleure.precision_gps_m ?? 9999)) {
-      meilleure = mesure;
-    }
-
+    const provisoire = agreger(mesures);
     if (surProgression) {
       surProgression({
-        precision: meilleure.precision_gps_m,
+        precision: provisoire?.precision_gps_m ?? null,
+        mesures: mesures.length,
         ecoule_ms: Date.now() - debut,
-        suffisante: (meilleure.precision_gps_m ?? 9999) <= precisionVisee,
+        suffisante: (provisoire?.precision_gps_m ?? 9999) <= precisionVisee,
       });
     }
 
-    if ((meilleure.precision_gps_m ?? 9999) <= precisionVisee) break;
+    // On ne s'arrête pas au premier point acceptable : c'est justement en
+    // continuant que la moyenne devient meilleure qu'une mesure isolée.
+    if (mesures.length >= 6 && (provisoire?.precision_gps_m ?? 9999) <= precisionVisee / 2) break;
 
-    await new Promise((r) => { setTimeout(r, 1200); });
+    await new Promise((r) => { setTimeout(r, 900); });
   }
+
+  const meilleure = agreger(mesures);
 
   if (!meilleure) {
     const err = new Error(
