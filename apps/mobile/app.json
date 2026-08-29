@@ -73,10 +73,7 @@
       "expo-asset"
     ],
     "extra": {
-      "apiUrl": "https://api.exemple.sn",
-      "eas": {
-        "projectId": "A_REMPLIR_APRES_eas_init"
-      }
+      "apiUrl": "https://api.exemple.sn"
     },
     "updates": {
       "enabled": true,

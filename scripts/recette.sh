@@ -87,10 +87,21 @@ echo "${GRAS}Recette fonctionnelle — plateforme de collecte des taxes locales$
 echo "${GRIS}$(date '+%d/%m/%Y %H:%M') · $API${NC}"
 [[ "$SANS_ECRIRE" == "1" ]] && echo "${GRIS}Mode lecture seule${NC}"
 
-psql_admin() {
-  docker exec -e PGPASSWORD="${DB_SUPERUSER_PASSWORD}" "$PG_CONTENEUR" \
-    psql -tAX -v ON_ERROR_STOP=1 -U "${DB_SUPERUSER}" -d "${DB_NAME}" "$@"
-}
+# La recette doit pouvoir tourner AVANT qu'un serveur existe : sur le poste du
+# développeur, PostgreSQL est installé directement, sans conteneur. Attendre le
+# serveur pour éprouver le métier reviendrait à découvrir les défauts au pire
+# moment — quand l'infrastructure est en jeu en même temps que le code.
+if docker inspect -f '{{.State.Running}}' "$PG_CONTENEUR" 2>/dev/null | grep -q true; then
+  psql_admin() {
+    docker exec -e PGPASSWORD="${DB_SUPERUSER_PASSWORD}" "$PG_CONTENEUR" \
+      psql -tAX -v ON_ERROR_STOP=1 -U "${DB_SUPERUSER}" -d "${DB_NAME}" "$@"
+  }
+elif command -v psql >/dev/null && psql -tAX -d "${DB_NAME}" -c 'SELECT 1' >/dev/null 2>&1; then
+  psql_admin() { psql -tAX -v ON_ERROR_STOP=1 -d "${DB_NAME}" "$@"; }
+else
+  echo "Aucune base joignable : ni le conteneur ${PG_CONTENEUR}, ni un PostgreSQL local sur ${DB_NAME}." >&2
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Nettoyage préventif : un passage interrompu a pu laisser des traces
