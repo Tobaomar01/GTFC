@@ -541,7 +541,7 @@ async function paquetHorsLigne(contexte, { depuis = null, zoneId = null } = {}) 
              c.todp_surface_m2, c.enseigne_surface_m2, c.surface_locale_m2,
              c.gerant_nom, c.gerant_prenom, c.gerant_telephone, c.telephone_paiement,
              c.point_repere, ST_X(c.geom) AS longitude, ST_Y(c.geom) AS latitude,
-             c.modifie_le, q.jeton AS qr_jeton
+             c.fiche_a_completer, c.modifie_le, q.jeton AS qr_jeton
         FROM app.commerce c
         LEFT JOIN app.qr_code q ON q.commerce_id = c.id AND q.actif
        WHERE ${filtre}

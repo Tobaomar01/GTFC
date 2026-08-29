@@ -38,12 +38,15 @@ export function ListeCommercesEcran({ navigation }) {
   const [commerces, setCommerces] = useState([]);
   const [recherche, setRecherche] = useState('');
   const [filtre, setFiltre] = useState(null);
+  const [aReprendre, setAReprendre] = useState(false);
   const [charge, setCharge] = useState(true);
 
   const charger = useCallback(async () => {
-    setCommerces(await listerCommerces({ recherche, statutFiscal: filtre, limite: 300 }));
+    setCommerces(await listerCommerces({
+      recherche, statutFiscal: filtre, aCompleter: aReprendre, limite: 300,
+    }));
     setCharge(false);
-  }, [recherche, filtre]);
+  }, [recherche, filtre, aReprendre]);
 
   useFocusEffect(useCallback(() => { charger(); }, [charger]));
 
@@ -83,6 +86,30 @@ export function ListeCommercesEcran({ navigation }) {
                 </Text>
               </TouchableOpacity>
             ))}
+
+            {/* Ce n'est pas un statut de paiement mais une liste de travail :
+                les fiches laissées incomplètes, à reprendre quand le gérant
+                sera là. D'où la puce distincte, en fin de rangée. */}
+            <TouchableOpacity
+              onPress={() => setAReprendre((v) => !v)}
+              style={[styles.puce, aReprendre && {
+                backgroundColor: couleurs.horsLigne, borderColor: couleurs.horsLigne,
+              }]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons
+                  name="person-add-outline"
+                  size={13}
+                  color={aReprendre ? '#FFF' : couleurs.texteSecondaire}
+                />
+                <Text style={[
+                  styles.puceTexte, aReprendre && { color: '#FFF', fontWeight: '700' },
+                ]}
+                >
+                  À reprendre
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
@@ -95,10 +122,13 @@ export function ListeCommercesEcran({ navigation }) {
         ListEmptyComponent={(
           <EtatVide
             icone="storefront-outline"
-            titre={recherche ? 'Aucun résultat' : 'Aucun commerce'}
-            texte={recherche
-              ? 'Essayez avec le début du nom, ou le code du commerce.'
-              : 'Synchronisez pour récupérer les commerces de votre zone, ou recensez-en un nouveau.'}
+            titre={aReprendre ? 'Rien à reprendre'
+              : (recherche ? 'Aucun résultat' : 'Aucun commerce')}
+            texte={aReprendre
+              ? 'Toutes vos fiches portent un nom de gérant et un numéro.'
+              : (recherche
+                ? 'Essayez avec le début du nom, ou le code du commerce.'
+                : 'Synchronisez pour récupérer les commerces de votre zone, ou recensez-en un nouveau.')}
           />
         )}
         renderItem={({ item }) => (
@@ -118,6 +148,16 @@ export function ListeCommercesEcran({ navigation }) {
                   {item.solde_du > 0 ? (
                     <Text style={[typographie.petit, { color: couleurs.impaye, fontWeight: '600' }]}>
                       {formaterXof(item.solde_du)} dus
+                    </Text>
+                  ) : null}
+                  {item.fiche_a_completer === 1 ? (
+                    <Text style={[typographie.petit, {
+                      color: couleurs.horsLigne, fontWeight: '600',
+                    }]}
+                    >
+                      {(item.gerant_nom ?? '').trim()
+                        ? 'À reprendre — numéro manquant'
+                        : 'À reprendre — gérant non relevé'}
                     </Text>
                   ) : null}
                 </View>

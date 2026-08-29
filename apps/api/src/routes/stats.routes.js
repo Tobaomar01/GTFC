@@ -76,19 +76,48 @@ router.get('/stats/agents',
   asyncHandler(async (req, res) => {
     const depuis = req.query.depuis ?? new Date(Date.now() - 7 * 86400000);
     const jusqua = req.query.jusqua ?? new Date();
+    // Le relevé porte sur TOUTES les natures d'intervention. N'en compter que
+    // trois donnait d'un agent occupé à des contrôles et des mises à jour
+    // l'image d'un agent inactif — et un indicateur qui mesure mal finit par
+    // orienter le travail vers ce qu'il mesure.
     const { rows } = await requete(req.contexte, `
-      SELECT agent_id, agent,
-             sum(nb_visites)::int AS visites,
-             sum(nb_enregistrements)::int AS enregistrements,
-             sum(nb_encaissements)::int AS encaissements,
-             sum(nb_visites_eloignees)::int AS visites_eloignees,
-             round(avg(duree_moyenne_s))::int AS duree_moyenne_s,
-             count(DISTINCT journee)::int AS jours_actifs
-        FROM app.v_activite_agent
-       WHERE journee BETWEEN $1::date AND $2::date
-       GROUP BY agent_id, agent
+      SELECT a.agent_id, a.agent,
+             sum(a.nb_visites)::int          AS visites,
+             sum(a.nb_enregistrements)::int  AS enregistrements,
+             sum(a.nb_mises_a_jour)::int     AS mises_a_jour,
+             sum(a.nb_controles)::int        AS controles,
+             sum(a.nb_encaissements)::int    AS paiements_assistes,
+             sum(a.nb_fermes)::int           AS fermes,
+             sum(a.nb_refus)::int            AS refus,
+             sum(a.nb_autres_objets)::int    AS autres_objets,
+             sum(a.minutes_intervention)::int AS minutes_intervention,
+             sum(a.nb_visites_eloignees)::int AS visites_eloignees,
+             round(avg(a.duree_moyenne_s))::int AS duree_moyenne_s,
+             count(DISTINCT a.journee)::int  AS jours_actifs,
+             -- Charge du second passage : ce que l'agent n'a pas pu compléter
+             -- parce que le gérant était absent.
+             coalesce((SELECT count(*) FROM app.v_fiche_a_completer f
+                        WHERE f.agent_recenseur_id = a.agent_id
+                          AND f.date_recensement BETWEEN $1::date AND $2::date), 0)::int
+                                             AS fiches_a_reprendre
+        FROM app.v_activite_agent a
+       WHERE a.journee BETWEEN $1::date AND $2::date
+       GROUP BY a.agent_id, a.agent
        ORDER BY visites DESC`, [depuis, jusqua]);
-    return ok(res, { periode: { depuis, jusqua }, agents: rows });
+
+    // Le reste à reprendre, toutes périodes confondues : c'est lui qui doit
+    // être vidé avant l'émission des avis, pas seulement celui de la semaine.
+    const { rows: reprises } = await requete(req.contexte, `
+      SELECT count(*)::int AS total,
+             count(*) FILTER (WHERE bloque_le_recouvrement)::int AS bloquantes,
+             max(jours_depuis_recensement)::int AS plus_ancienne_jours
+        FROM app.v_fiche_a_completer`);
+
+    return ok(res, {
+      periode: { depuis, jusqua },
+      agents: rows,
+      fiches_a_completer: reprises[0],
+    });
   }));
 
 /** Contrôles de cohérence métier — à consulter avant chaque facturation. */

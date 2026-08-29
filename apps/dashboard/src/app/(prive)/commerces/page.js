@@ -22,7 +22,9 @@ function Liste() {
   const [donnees, setDonnees] = useState(null);
   const [zones, setZones] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [filtres, setFiltres] = useState({ q: '', zone_id: null, statut_fiscal: null, categorie_id: null });
+  const [filtres, setFiltres] = useState({
+    q: '', zone_id: null, statut_fiscal: null, categorie_id: null, a_completer: null,
+  });
   const [page, setPage] = useState(1);
   const [selection, setSelection] = useState(null);
   const [erreur, setErreur] = useState(null);
@@ -50,10 +52,33 @@ function Liste() {
     if (id) setSelection(id);
   }, [params]);
 
+  // Arrivée depuis le recueil d'activité : la liste des fiches à reprendre.
+  useEffect(() => {
+    if (params.get('a_completer') === 'true') {
+      setFiltres((f) => (f.a_completer ? f : { ...f, a_completer: true }));
+      setPage(1);
+    }
+  }, [params]);
+
   if (erreur) return <Message type="erreur" titre="Chargement impossible">{erreur}</Message>;
 
   return (
     <div className="space-y-4">
+      {filtres.a_completer ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-carte
+          border border-bordure bg-surface-alt px-4 py-3 sans-impression">
+          <p className="text-[13px] text-encre-2">
+            <strong>Fiches à reprendre</strong> — recensées sans le nom du gérant ou
+            sans numéro. Sans numéro, le SMS mensuel portant le lien Wave ne part pas.
+          </p>
+          <Bouton taille="petit" variante="discret"
+            onClick={() => { setFiltres({ ...filtres, a_completer: null }); setPage(1); }}
+          >
+            Voir tous les commerces
+          </Bouton>
+        </div>
+      ) : null}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 sans-impression">
         <Champ
           etiquette="Rechercher"

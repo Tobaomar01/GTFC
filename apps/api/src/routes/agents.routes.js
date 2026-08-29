@@ -249,17 +249,50 @@ router.get('/:id/activite',
     const jusqua = req.query.jusqua ?? new Date();
 
     const journees = await requete(req.contexte, `
-        SELECT journee, nb_visites, nb_enregistrements, nb_encaissements,
-               nb_commerces_distincts, duree_moyenne_s, nb_visites_eloignees,
+        SELECT journee, nb_visites, nb_enregistrements, nb_mises_a_jour,
+               nb_controles, nb_encaissements, nb_fermes, nb_refus,
+               nb_introuvables, nb_autres_objets, nb_commerces_distincts,
+               duree_moyenne_s, minutes_intervention, amplitude_h,
+               nb_hors_ligne, nb_visites_eloignees,
                premiere_visite, derniere_visite
           FROM app.v_activite_agent
          WHERE agent_id = $1 AND journee BETWEEN $2::date AND $3::date
          ORDER BY journee DESC`, [req.params.id, depuis, jusqua]);
 
+    // Le cumul sur la période, et non la somme des lignes affichées : la page
+    // en montre trente au plus, le total doit porter sur tout l'intervalle.
+    const totaux = await requete(req.contexte, `
+        SELECT count(DISTINCT journee)::int            AS jours_actifs,
+               coalesce(sum(nb_visites), 0)::int       AS visites,
+               coalesce(sum(nb_enregistrements), 0)::int AS recensements,
+               coalesce(sum(nb_mises_a_jour), 0)::int  AS mises_a_jour,
+               coalesce(sum(nb_controles), 0)::int     AS controles,
+               coalesce(sum(nb_encaissements), 0)::int AS paiements_assistes,
+               coalesce(sum(nb_refus), 0)::int         AS refus,
+               coalesce(sum(nb_fermes), 0)::int        AS fermes,
+               coalesce(sum(nb_introuvables), 0)::int  AS introuvables,
+               coalesce(sum(nb_autres_objets), 0)::int AS autres_objets,
+               coalesce(sum(minutes_intervention), 0)::int AS minutes_intervention,
+               coalesce(sum(nb_visites_eloignees), 0)::int AS visites_eloignees
+          FROM app.v_activite_agent
+         WHERE agent_id = $1 AND journee BETWEEN $2::date AND $3::date`,
+    [req.params.id, depuis, jusqua]);
+
+    // Ce que l'agent a laissé derrière lui. Ce n'est pas un reproche : la
+    // boutique était ouverte et le gérant absent, il fallait bien avancer.
+    // C'est la charge de son second passage.
+    const reprises = await requete(req.contexte, `
+        SELECT count(*)::int AS n
+          FROM app.v_fiche_a_completer
+         WHERE agent_recenseur_id = $1
+           AND date_recensement BETWEEN $2::date AND $3::date`,
+    [req.params.id, depuis, jusqua]);
+
     return ok(res, {
       periode: { depuis, jusqua },
       journees: journees.rows,
-      especes_non_versees: especes.rows[0] ?? null,
+      total: totaux.rows[0] ?? null,
+      fiches_a_reprendre: reprises.rows[0]?.n ?? 0,
     });
   }));
 

@@ -21,7 +21,7 @@
  * est reconnu et non réappliqué.
  */
 
-export const VERSION_SCHEMA = 2;
+export const VERSION_SCHEMA = 3;
 
 export const SCHEMA_SQL = `
 PRAGMA journal_mode = WAL;
@@ -86,6 +86,10 @@ CREATE TABLE IF NOT EXISTS commerce (
   statut_fiscal       TEXT DEFAULT 'inconnu',
   solde_du            INTEGER DEFAULT 0,
   qr_jeton            TEXT,
+
+  -- Fiche recensee sans le gerant : boutique ouverte, personne pour repondre.
+  -- Calculee par le serveur, jamais saisie ici : le telephone la recopie.
+  fiche_a_completer   INTEGER DEFAULT 0,
   notes               TEXT,
 
   -- Valeurs par défaut délibérément « pessimistes » : une ligne insérée sans
@@ -352,5 +356,11 @@ export const MIGRATIONS = [
     version: 2,
     sql: 'ALTER TABLE commerce ADD COLUMN rue_id TEXT;'
        + 'ALTER TABLE commerce ADD COLUMN numero_rue TEXT;',
+  },
+  {
+    // Le second passage : marquer les fiches laissees incompletes plutot que
+    // de les laisser se confondre avec les fiches abouties.
+    version: 3,
+    sql: 'ALTER TABLE commerce ADD COLUMN fiche_a_completer INTEGER DEFAULT 0;',
   },
 ];

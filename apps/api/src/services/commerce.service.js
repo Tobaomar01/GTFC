@@ -24,7 +24,7 @@ const CHAMPS_LISTE = `
   c.adresse_libelle, c.point_repere, c.ninea, c.numero_patente,
   ST_X(c.geom) AS longitude, ST_Y(c.geom) AS latitude, c.precision_gps_m,
   c.quartier_detecte_auto, c.date_recensement, c.derniere_visite_le,
-  c.nb_visites, c.version, c.origine, c.cree_le, c.modifie_le,
+  c.nb_visites, c.version, c.origine, c.fiche_a_completer, c.cree_le, c.modifie_le,
   cat.id AS categorie_id, cat.libelle AS categorie,
   z.id AS zone_id, z.code AS zone_code, z.nom AS zone,
   q.id AS quartier_id, q.nom AS quartier`;
@@ -333,6 +333,12 @@ async function lister(contexte, filtres, { limite, decalage }, tri) {
   if (filtres.marche_id) ajouter('c.marche_id = $?', filtres.marche_id);
   if (filtres.agent_id) ajouter('c.agent_recenseur_id = $?', filtres.agent_id);
   if (filtres.avec_todp === true) conditions.push('c.todp_surface_m2 > 0');
+  // Le second passage : les fiches recensées sans le gérant, à reprendre.
+  // Filtre présent ou absent, jamais inversé : sur une chaîne de requête,
+  // `z.coerce.boolean` rend vrai pour toute valeur non vide — « false »
+  // compris. Un `a_completer=false` qui filtrerait l'inverse de ce qu'il dit
+  // serait un piège ; on ne l'offre pas.
+  if (filtres.a_completer === true) conditions.push('c.fiche_a_completer');
   if (filtres.sans_qr === true) {
     conditions.push('NOT EXISTS (SELECT 1 FROM app.qr_code q WHERE q.commerce_id = c.id AND q.actif)');
   }

@@ -24,12 +24,14 @@ const normaliser = (t) => String(t ?? '')
 // Lecture
 // ---------------------------------------------------------------------------
 export async function listerCommerces({ recherche = '', quartierId = null,
-  statutFiscal = null, limite = 100 } = {}) {
+  statutFiscal = null, aCompleter = false, limite = 100 } = {}) {
   const conditions = [];
   const params = [];
 
   if (quartierId) { conditions.push('c.quartier_id = ?'); params.push(quartierId); }
   if (statutFiscal) { conditions.push('c.statut_fiscal = ?'); params.push(statutFiscal); }
+  // La liste du second passage.
+  if (aCompleter) conditions.push('c.fiche_a_completer = 1');
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   params.push(limite);
@@ -120,6 +122,20 @@ export function distanceMetres(lat1, lon1, lat2, lon2) {
  * Retourne l'identifiant local : l'agent peut immédiatement y attacher des
  * photos, avant même que le serveur n'ait attribué son identifiant définitif.
  */
+/**
+ * Une fiche est à reprendre tant qu'il manque le nom du gérant ou un numéro.
+ *
+ * Sans numéro le redevable est hors d'atteinte : le pilote n'a qu'un canal de
+ * recouvrement, le SMS mensuel portant le lien Wave. Sans nom, l'avis désigne
+ * une enseigne et n'est opposable à personne.
+ *
+ * Doit rester alignée sur `app.commerce.fiche_a_completer` (migration 0052).
+ */
+export function ficheACompleter(c) {
+  const tel = (c.telephone_paiement ?? c.gerant_telephone ?? '').trim();
+  return !(c.gerant_nom ?? '').trim() || !tel;
+}
+
 export async function creerCommerce(donnees, taxes = []) {
   const idLocal = nouvelId();
   const ts = maintenant();
@@ -133,8 +149,9 @@ export async function creerCommerce(donnees, taxes = []) {
         longitude, latitude, precision_gps_m,
         surface_locale_m2, todp_surface_m2, enseigne_surface_m2, enseigne_lumineuse,
         marche_id, type_emplacement_id, numero_emplacement, nb_jours_marche,
-        statut, notes, origine_locale, modifie_localement, cree_le, modifie_le
-      ) VALUES (?,?,?,?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?, ?,?,?,?, ?,?,?,?, ?,?,1,1,?,?)`,
+        statut, notes, fiche_a_completer,
+        origine_locale, modifie_localement, cree_le, modifie_le
+      ) VALUES (?,?,?,?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?, ?,?,?,?, ?,?,?,?, ?,?,?,1,1,?,?)`,
     [
       idLocal, donnees.enseigne, donnees.activite_precise ?? null, donnees.categorie_id,
       donnees.zone_id ?? null, donnees.quartier_id ?? null,
@@ -148,7 +165,13 @@ export async function creerCommerce(donnees, taxes = []) {
       donnees.enseigne_surface_m2 ?? null, donnees.enseigne_lumineuse ? 1 : 0,
       donnees.marche_id ?? null, donnees.type_emplacement_id ?? null,
       donnees.numero_emplacement ?? null, donnees.nb_jours_marche ?? null,
-      donnees.statut ?? 'actif', donnees.notes ?? null, ts, ts,
+      donnees.statut ?? 'actif', donnees.notes ?? null,
+      // Même règle que le serveur (migration 0052) : sans nom de gérant ou
+      // sans numéro, la fiche est à reprendre. On l'évalue ici pour que le
+      // marquage apparaisse aussitôt, sans attendre la synchronisation ; le
+      // serveur la recalcule et fait foi.
+      ficheACompleter(donnees) ? 1 : 0,
+      ts, ts,
     ]);
 
     for (const t of taxes) {
@@ -196,6 +219,14 @@ export async function modifierCommerce(idLocal, modifications) {
     await db.runAsync(
       `UPDATE commerce SET ${sets}, modifie_localement = 1, modifie_le = ? WHERE id_local = ?`,
       [...valeurs, ts, idLocal],
+    );
+
+    // Compléter le nom ou le numéro doit faire sortir la fiche de la liste de
+    // reprise — et la vider doit l'y remettre. On réévalue sur la fiche telle
+    // qu'elle est après modification, pas sur les seuls champs envoyés.
+    await db.runAsync(
+      'UPDATE commerce SET fiche_a_completer = ? WHERE id_local = ?',
+      [ficheACompleter({ ...commerce, ...modifications }) ? 1 : 0, idLocal],
     );
 
     await db.runAsync(`
@@ -254,13 +285,15 @@ export async function fusionnerDepuisServeur(commerces) {
             longitude = ?, latitude = ?, surface_locale_m2 = ?,
             todp_surface_m2 = ?, enseigne_surface_m2 = ?,
             statut = ?, statut_fiscal = ?, solde_du = ?, qr_jeton = ?,
+            fiche_a_completer = ?,
             origine_locale = 0, modifie_localement = 0, modifie_le = ?
           WHERE id_local = ?`,
         [c.version, c.code, c.enseigne, c.categorie_id, c.zone_id, c.quartier_id,
           c.gerant_nom, c.gerant_prenom, c.gerant_telephone, c.telephone_paiement,
           c.point_repere, c.longitude, c.latitude, c.surface_locale_m2,
           c.todp_surface_m2, c.enseigne_surface_m2, c.statut, c.statut_fiscal,
-          c.solde_du, c.qr_jeton, c.modifie_le, local.id_local]);
+          c.solde_du, c.qr_jeton, c.fiche_a_completer ? 1 : 0,
+          c.modifie_le, local.id_local]);
         majs += 1;
       } else {
         await db.runAsync(`
@@ -269,14 +302,15 @@ export async function fusionnerDepuisServeur(commerces) {
             zone_id, quartier_id, gerant_nom, gerant_prenom, gerant_telephone,
             telephone_paiement, point_repere, longitude, latitude,
             surface_locale_m2, todp_surface_m2, enseigne_surface_m2,
-            statut, statut_fiscal, solde_du, qr_jeton,
+            statut, statut_fiscal, solde_du, qr_jeton, fiche_a_completer,
             origine_locale, modifie_localement, cree_le, modifie_le
-          ) VALUES (?,?,?,?,?,?, ?,?,?,?,?, ?,?,?,?, ?,?,?, ?,?,?,?, 0,0,?,?)`,
+          ) VALUES (?,?,?,?,?,?, ?,?,?,?,?, ?,?,?,?, ?,?,?, ?,?,?,?,?, 0,0,?,?)`,
         [nouvelId(), c.id, c.version, c.code, c.enseigne, c.categorie_id,
           c.zone_id, c.quartier_id, c.gerant_nom, c.gerant_prenom, c.gerant_telephone,
           c.telephone_paiement, c.point_repere, c.longitude, c.latitude,
           c.surface_locale_m2, c.todp_surface_m2, c.enseigne_surface_m2,
           c.statut, c.statut_fiscal, c.solde_du, c.qr_jeton,
+          c.fiche_a_completer ? 1 : 0,
           c.modifie_le ?? maintenant(), c.modifie_le ?? maintenant()]);
         inseres += 1;
       }

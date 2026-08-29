@@ -227,6 +227,74 @@ test('une fiche sans gérant produit un redevable non joignable', async () => {
   assert.equal(redevable.telephone, null);
 });
 
+test('la fiche sans gérant part dans la liste du second passage', async () => {
+  const commerce = await un(
+    `SELECT id, fiche_a_completer FROM app.commerce
+      WHERE enseigne = $1 AND archive_le IS NULL`, [`${MARQUE} Boutique Fermee`]);
+
+  assert.equal(commerce.fiche_a_completer, true);
+
+  const reprise = await un(
+    'SELECT manque, bloque_le_recouvrement FROM app.v_fiche_a_completer WHERE id = $1',
+    [commerce.id]);
+  assert.ok(reprise, 'la fiche incomplète doit remonter dans la liste de reprise');
+  assert.equal(reprise.manque, 'nom et numéro');
+
+  // Sans numéro, le SMS mensuel portant le lien Wave ne part pas : la fiche
+  // ne rapportera rien tant qu'elle n'est pas complétée.
+  assert.equal(reprise.bloque_le_recouvrement, true);
+
+  // La fiche complète, elle, n'y figure pas.
+  const complete = await un(
+    `SELECT fiche_a_completer FROM app.commerce
+      WHERE enseigne = $1 AND archive_le IS NULL`, [`${MARQUE} Boutique Un`]);
+  assert.equal(complete.fiche_a_completer, false);
+});
+
+test('la règle du serveur et celle du téléphone disent la même chose', async () => {
+  // La règle est écrite deux fois : en colonne calculée ici, en JavaScript sur
+  // le téléphone pour que le marquage apparaisse avant la synchronisation.
+  // Deux écritures d'une même règle divergent tôt ou tard — ce test les tient
+  // ensemble. Le pendant embarqué est apps/mobile/tests/fiche-a-completer.test.js.
+  const cas = [
+    { nom: 'Diallo', tel_gerant: '+221770000001', tel_paiement: null, attendu: false },
+    { nom: 'Diallo', tel_gerant: null, tel_paiement: '+221770000002', attendu: false },
+    { nom: 'Diallo', tel_gerant: null, tel_paiement: null, attendu: true },
+    { nom: null, tel_gerant: '+221770000003', tel_paiement: null, attendu: true },
+    { nom: null, tel_gerant: null, tel_paiement: null, attendu: true },
+    { nom: '   ', tel_gerant: '+221770000004', tel_paiement: null, attendu: true },
+    { nom: 'Diallo', tel_gerant: '  ', tel_paiement: null, attendu: true },
+  ];
+
+  for (const c of cas) {
+    const r = await un(`
+      SELECT ($1::text IS NULL
+              OR nullif(btrim($1::text), '') IS NULL
+              OR coalesce(nullif(btrim($3::text), ''),
+                          nullif(btrim($2::text), '')) IS NULL) AS a_completer`,
+    [c.nom, c.tel_gerant, c.tel_paiement]);
+    assert.equal(r.a_completer, c.attendu, `désaccord sur ${JSON.stringify(c)}`);
+  }
+});
+
+test('le recueil d\'activité d\'un agent répond', async () => {
+  // Il levait une ReferenceError : la réponse renvoyait encore un total
+  // d'espèces non versées, alors que la vue avait disparu avec les espèces
+  // (migration 0041). Toute ouverture de la fiche d'un agent tombait en 500.
+  const agent = await un(
+    'SELECT id FROM app.utilisateur WHERE telephone = $1', [AGENT]);
+
+  const reponse = await appel(`/agents/${agent.id}/activite`);
+  assert.equal(reponse.statut, 200, reponse.texte);
+
+  const d = reponse.json.donnees;
+  assert.ok(d.total, 'le cumul de la période doit être renvoyé');
+  assert.equal(typeof d.total.recensements, 'number');
+  assert.equal(typeof d.fiches_a_reprendre, 'number');
+  assert.equal('especes_non_versees' in d, false,
+    'plus aucune trace d\'espèces : le pilote n\'en encaisse pas');
+});
+
 test('les taxes rattachées couvrent la période : l\'avis ne sera pas vide', async () => {
   const commerce = await un(
     `SELECT id, code FROM app.commerce

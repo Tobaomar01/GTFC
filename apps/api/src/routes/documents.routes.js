@@ -339,6 +339,25 @@ router.get('/exports/commerces.csv',
     return res.send(r.contenu);
   }));
 
+router.get('/exports/activite-agents.csv',
+  valider(z.object({
+    depuis: z.coerce.date().optional(),
+    jusqua: z.coerce.date().optional(),
+    agent_id: uuid.optional(),
+  }), 'query'),
+  asyncHandler(async (req, res) => {
+    const r = await exports_.activiteAgentsCsv(await contexteEnrichi(req), {
+      depuis: req.query.depuis ?? new Date(Date.now() - 30 * 86400000),
+      jusqua: req.query.jusqua ?? new Date(),
+      agent_id: req.query.agent_id,
+    });
+    res.type('text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition',
+      `attachment; filename="${nomFichier('activite-agents', 'csv')}"`);
+    res.setHeader('X-Nb-Lignes', String(r.nbLignes));
+    return res.send(r.contenu);
+  }));
+
 router.get('/exports/commerces.geojson',
   valider(filtresCommerces, 'query'),
   asyncHandler(async (req, res) => {

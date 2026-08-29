@@ -96,6 +96,7 @@ const schemaFiltres = pagination.extend({
   statut_fiscal: z.enum(['a_jour', 'partiel', 'impaye', 'exonere', 'inconnu']).optional(),
   avec_todp: z.coerce.boolean().optional(),
   sans_qr: z.coerce.boolean().optional(),
+  a_completer: z.coerce.boolean().optional(),
 });
 
 const TRIS_AUTORISES = ['c.code', 'c.enseigne', 'c.cree_le', 'c.modifie_le',

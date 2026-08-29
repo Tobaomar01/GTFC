@@ -25,7 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useApp } from '../contextes/AppContexte';
 import { referentielsComplets, lireReferentiel } from '../bdd/sync.repo';
-import { creerCommerce, commercesProches } from '../bdd/commerces.repo';
+import { creerCommerce, commercesProches, ficheACompleter } from '../bdd/commerces.repo';
 import { quartiersParProximite } from '../services/localisation';
 import {
   Bouton, Champ, Selecteur, Message, Chargement, Separateur, Carte,
@@ -155,13 +155,37 @@ export function RecensementEcran({ navigation }) {
       setCommerceLocal(idLocal);
       setEnregistre(true);
 
+      // Deux rappels possibles, un seul écran : deux alertes lancées ensemble
+      // se recouvrent, et l'agent n'en lit aucune. On les réunit, la reprise
+      // en tête parce qu'une fiche sans numéro ne rapporte rien du tout.
+      const rappels = [];
+
+      // Le gérant n'était pas là. On le dit maintenant, pendant que l'agent
+      // est encore devant la boutique : c'est le seul moment où il peut
+      // demander le numéro au voisin ou noter un repère pour son retour.
+      if (ficheACompleter(donnees)) {
+        const manque = (donnees.gerant_nom ?? '').trim()
+          ? 'le numéro de téléphone'
+          : 'le nom du gérant et son numéro';
+        rappels.push(
+          `La devanture est enregistrée, mais il manque ${manque}.\n\n`
+          + 'Sans numéro, l\'avis mensuel avec le lien Wave ne part pas : ce '
+          + 'commerce ne paiera rien tant que la fiche est incomplète. Elle '
+          + 'apparaît dans « À reprendre » sur la liste des commerces.');
+      }
+
+      // Simple rappel, pas un blocage : un restaurant sans débordement
+      // constaté est parfaitement possible.
       if (categorie?.todp_probable && !mesuresTaxes.todp) {
-        // Simple rappel, pas un blocage : un restaurant sans débordement
-        // constaté est parfaitement possible.
+        rappels.push(
+          `Les commerces de type « ${categorie.libelle} » débordent souvent sur `
+          + 'le domaine public. Si c\'est le cas ici, revenez ajouter la mesure TODP.');
+      }
+
+      if (rappels.length > 0) {
         setTimeout(() => Alert.alert(
-          'Vérifiez le trottoir',
-          `Les commerces de type « ${categorie.libelle} » débordent souvent sur le domaine public. `
-          + 'Si c\'est le cas ici, revenez ajouter la mesure TODP.',
+          ficheACompleter(donnees) ? 'Fiche à reprendre' : 'Vérifiez le trottoir',
+          rappels.join('\n\n'),
         ), 400);
       }
     } catch (err) {

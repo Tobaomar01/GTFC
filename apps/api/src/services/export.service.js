@@ -617,7 +617,62 @@ async function commercesGeoJson(contexte, filtres = {}) {
   };
 }
 
+/**
+ * Recueil d'activité des agents, jour par jour.
+ *
+ * Une ligne par agent et par journée, toutes natures d'intervention. C'est le
+ * relevé qu'on emporte en réunion et qu'on classe : l'écran sert au pilotage
+ * du jour, le fichier sert à rendre compte sur la durée.
+ *
+ * Il ne contient AUCUNE trace de déplacement. Le suivi de position des agents
+ * a été écarté (FR-051a, FR-051b) ; la seule colonne géographique est l'écart
+ * entre le point relevé lors d'une intervention et celui du commerce, qui est
+ * un contrôle de qualité de la donnée.
+ */
+const COLONNES_ACTIVITE_CSV = [
+  { cle: 'journee', titre: 'Journee' },
+  { cle: 'agent', titre: 'Agent' },
+  { cle: 'nb_visites', titre: 'Interventions' },
+  { cle: 'nb_enregistrements', titre: 'Recensements' },
+  { cle: 'nb_mises_a_jour', titre: 'Mises a jour' },
+  { cle: 'nb_controles', titre: 'Controles' },
+  { cle: 'nb_encaissements', titre: 'Paiements assistes' },
+  { cle: 'nb_autres_objets', titre: 'Affichages et chantiers' },
+  { cle: 'nb_fermes', titre: 'Fermes' },
+  { cle: 'nb_refus', titre: 'Refus' },
+  { cle: 'nb_introuvables', titre: 'Introuvables' },
+  { cle: 'nb_commerces_distincts', titre: 'Commerces distincts' },
+  { cle: 'minutes_intervention', titre: 'Minutes en intervention' },
+  { cle: 'duree_moyenne_s', titre: 'Duree moyenne (s)' },
+  { cle: 'amplitude_h', titre: 'Amplitude (h)' },
+  { cle: 'nb_hors_ligne', titre: 'Saisies hors ligne' },
+  { cle: 'nb_visites_eloignees', titre: 'Positions a verifier' },
+];
+
+async function activiteAgentsCsv(contexte, { depuis, jusqua, agent_id: agentId = null } = {}) {
+  const params = [depuis, jusqua];
+  let filtre = 'journee BETWEEN $1::date AND $2::date';
+  if (agentId) { params.push(agentId); filtre += ` AND agent_id = $${params.length}`; }
+
+  const { rows } = await requete(contexte, `
+    SELECT journee, agent, nb_visites, nb_enregistrements, nb_mises_a_jour,
+           nb_controles, nb_encaissements, nb_autres_objets, nb_fermes,
+           nb_refus, nb_introuvables, nb_commerces_distincts,
+           minutes_intervention, duree_moyenne_s, amplitude_h,
+           nb_hors_ligne, nb_visites_eloignees
+      FROM app.v_activite_agent
+     WHERE ${filtre}
+     ORDER BY journee DESC, agent`, params);
+
+  await tracerExport(contexte, {
+    format: 'csv', entite: 'activite_agents',
+    filtres: { depuis, jusqua, agent_id: agentId }, nbLignes: rows.length });
+
+  return { contenu: versCsv(rows, COLONNES_ACTIVITE_CSV), nbLignes: rows.length };
+}
+
 module.exports = {
+  activiteAgentsCsv,
   commercesExcel, commercesPdf, paiementsExcel, recouvrementPdf,
   commercesCsv, commercesGeoJson, versCsv, champCsv,
   PLAFOND,
