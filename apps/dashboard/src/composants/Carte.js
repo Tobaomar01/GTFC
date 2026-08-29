@@ -60,6 +60,7 @@ export default function CarteCommerces({
   const couche = useRef(null);
   const coucheRues = useRef(null);
   const [pret, setPret] = useState(false);
+  const [sansFond, setSansFond] = useState(false);
   const [erreur, setErreur] = useState(null);
 
   // --- Initialisation, une seule fois -------------------------------------
@@ -97,18 +98,30 @@ export default function CarteCommerces({
         //
         // Les DONNÉES restent celles d'OpenStreetMap : ce sont les tuiles
         // qui sont générées et servies localement, d'où l'attribution.
-        L.tileLayer(URL_TUILES, {
+        const tuiles = L.tileLayer(URL_TUILES, {
           maxZoom: 19,
           // Attribution obligatoire : OpenStreetMap est sous licence ODbL.
           attribution: '&copy; contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> — tuiles servies par la commune',
         }).addTo(carte.current);
 
+        // Un fond de plan absent n'est pas une panne de carte.
+        //
+        // Les rues et les commerces se dessinent de toute façon : ce sont nos
+        // données, pas celles du serveur de tuiles. On le signale d'un
+        // bandeau discret au lieu de remplacer la carte par une erreur, qui
+        // priverait le responsable d'une information qu'il peut encore lire.
+        let signale = false;
+        tuiles.on('tileerror', () => {
+          if (signale) return;
+          signale = true;
+          setSansFond(true);
+        });
+
         setPret(true);
       } catch (err) {
-        setErreur(
-          'La carte n\'a pas pu être chargée. Vérifiez que le serveur de tuiles '
-          + 'de la commune répond — voir NEXT_PUBLIC_TUILES_URL.',
-        );
+        // Ici, c'est Leaflet lui-même qui n'a pas pu être chargé : là, il n'y
+        // a effectivement plus de carte du tout.
+        setErreur('La carte n\'a pas pu être initialisée. Rechargez la page.');
       }
     })();
 
@@ -277,10 +290,18 @@ export default function CarteCommerces({
     <div className="relative overflow-hidden rounded-carte border border-bordure"
       style={{ height: hauteur }}
     >
-      <div ref={conteneur} className="h-full w-full" />
+      {/* Une teinte de fond plutôt que du blanc : sans tuiles, un fond blanc
+          se lit comme une panne, alors que rues et commerces s'affichent. */}
+      <div ref={conteneur} className="h-full w-full"
+        style={{ background: sansFond ? 'var(--surface-alt, #EDF1EC)' : undefined }} />
       {!pret && (
         <div className="absolute inset-0 flex items-center justify-center bg-surface-alt text-sm text-encre-2">
           Chargement de la carte…
+        </div>
+      )}
+      {pret && sansFond && (
+        <div className="absolute left-2 top-2 z-[500] rounded-md border border-bordure bg-surface/95 px-2.5 py-1.5 text-[12px] text-encre-2 shadow-sm">
+          Fond de plan indisponible — rues et commerces restent affichés
         </div>
       )}
     </div>
