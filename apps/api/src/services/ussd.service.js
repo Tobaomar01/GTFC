@@ -50,25 +50,11 @@ function formaterMontant(n) {
  * service appelant ne doit pas pouvoir distinguer les deux cas.
  */
 async function situationParTelephone(contexte, telephone) {
-  const { rows } = await requete(contexte, `
-    SELECT r.id, r.designation, r.solde_du, r.nb_objets_taxables,
-           a.numero AS avis_numero, a.montant_restant, a.date_exigibilite
-      FROM app.redevable r
-      LEFT JOIN LATERAL (
-        SELECT ai.numero, ai.montant_restant, ai.date_exigibilite
-          FROM app.avis_imposition ai
-         WHERE ai.redevable_id = r.id
-           AND ai.annule_le IS NULL
-           AND ai.statut <> 'brouillon'
-           AND ai.montant_restant > 0
-         ORDER BY ai.date_exigibilite
-         LIMIT 1
-      ) a ON true
-     WHERE r.telephone = $1
-       -- GTFC modélise la vérification par un statut daté et attribué,
-       -- plus riche qu'un booléen : on s'y conforme (FR-005c).
-       AND r.statut_telephone = 'verifie'
-       AND r.archive_le IS NULL`, [telephone]);
+  // Passe par une fonction SECURITY DEFINER : l'USSD est inter-communes par
+  // nature — c'est le numéro appelant qui détermine la commune — alors que
+  // l'isolation exige un contexte connu d'avance (voir migration 0050).
+  const { rows } = await requete(contexte,
+    'SELECT * FROM app.consultation_ussd($1)', [telephone]);
   return rows[0] ?? null;
 }
 
