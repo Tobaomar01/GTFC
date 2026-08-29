@@ -141,3 +141,48 @@ test('l\'administrateur ne peut pas non plus promouvoir un compte existant', asy
   const apres = await un('SELECT role FROM app.utilisateur WHERE id = $1', [agent.id]);
   assert.equal(apres.role, agent.role, 'le rôle a été modifié malgré le refus');
 });
+
+test('le chef de projet voit l\'ensemble du dispositif', async () => {
+  // Il conduit le déploiement : un responsable à qui les écrans sont fermés
+  // ne peut pas soutenir ce qu'il déploie.
+  const jeton = await connecter(CHEF_PROJET);
+  for (const chemin of ['/stats/tableau-bord', '/commerces?limite=5', '/avis?limite=5',
+    '/paiements?limite=5', '/stats/agents', '/agents', '/rues', '/taxes/baremes',
+    '/periodes', '/audit?limite=5']) {
+    const r = await appel(chemin, { jeton });
+    assert.ok(r.statut === 200 || r.statut === 404,
+      `${chemin} : ${r.statut} — ${r.texte.slice(0, 140)}`);
+  }
+});
+
+test('le chef de projet n\'écrit ni le barème ni les échéances', async () => {
+  // La constitution interdit au personnel de l'exploitant technique du
+  // partenariat tout droit sur les échéances et sur le barème (principe III).
+  // Voir tout n'est pas pouvoir tout.
+  const jeton = await connecter(CHEF_PROJET);
+  const interdits = [
+    ['POST', '/taxes/baremes', { code: 'zz' }],
+    ['POST', '/periodes', { annee: 2029 }],
+    ['POST', '/paiements', { commerce_id: null, montant: 1000 }],
+    ['POST', '/commerces', { enseigne: 'ZZ' }],
+    ['POST', '/agents', { nom: 'ZZ', prenom: 'ZZ', telephone: '+221779999902', role: 'agent', mot_de_passe_provisoire: 'MotDePasse2026!' }],
+  ];
+  for (const [methode, chemin, corps] of interdits) {
+    const r = await appel(chemin, { methode, corps, jeton });
+    assert.equal(r.statut, 403,
+      `${methode} ${chemin} : attendu 403, obtenu ${r.statut} — ${r.texte.slice(0, 140)}`);
+  }
+});
+
+test('le chef de projet garde la main sur ce qu\'il instruit', async () => {
+  // Ses saisies restent ouvertes : sans effet tant que la municipalité n'a
+  // pas validé, elles préparent une décision plutôt qu'elles ne l'appliquent.
+  // Un corps incomplet doit être refusé pour ce motif, non pour cause de
+  // profil en consultation.
+  const jeton = await connecter(CHEF_PROJET);
+  for (const chemin of ['/derogations/montant-force', '/exonerations']) {
+    const r = await appel(chemin, { methode: 'POST', corps: {}, jeton });
+    assert.notEqual(r.statut, 403,
+      `${chemin} est fermé au chef de projet : ${r.texte.slice(0, 140)}`);
+  }
+});

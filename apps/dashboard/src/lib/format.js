@@ -107,15 +107,19 @@ export const ROLES = {
   maire: 'Maire',
 };
 
-/** Profils qui consultent sans jamais écrire. */
-export const LECTURE_SEULE = new Set(['maire']);
-export const consulteSeulement = (role) => LECTURE_SEULE.has(role);
+/**
+ * Profils qui lisent tout et n'écrivent que des actes nommés : le maire, qui
+ * valide les remises de dette, et le chef de projet, qui les instruit.
+ */
+export const PROFILS_CONSULTATION = new Set(['maire', 'chef_projet']);
+export const consulteSeulement = (role) => PROFILS_CONSULTATION.has(role);
 
 /** Le rôle donne accès à ce que peuvent les rôles au-dessous. */
 // Le maire est au niveau du superviseur : il voit tous les écrans de
 // consultation de sa commune. Ce n'est pas une équivalence de pouvoir — ce
 // qu'il peut écrire est fermé par l'API, à l'authentification.
 const NIVEAU = {
-  agent: 1, superviseur: 2, maire: 2, admin_commune: 3, super_admin: 4,
+  agent: 1, superviseur: 2, maire: 2, admin_commune: 3,
+  super_admin: 4, chef_projet: 4,
 };
 export const auMoins = (role, minimum) => (NIVEAU[role] ?? 0) >= (NIVEAU[minimum] ?? 99);
