@@ -17,6 +17,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { STATUTS, xof } from '@/lib/format';
 
+/**
+ * Source des tuiles. Par défaut le serveur communal ; configurable pour le
+ * développement. Une orthophoto par drone y prendra la place du fond OSM
+ * sans changer une ligne : c'est la même URL, un autre contenu.
+ */
+const URL_TUILES = process.env.NEXT_PUBLIC_TUILES_URL
+  ?? '/tuiles/{z}/{x}/{y}.png';
+
 const CENTRE_DEFAUT = [14.6862, -17.4470];   // Gueule Tapée-Fass-Colobane
 
 /**
@@ -75,17 +83,31 @@ export default function CarteCommerces({
           attributionControl: true,
         });
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // Les tuiles viennent du serveur communal, jamais d'un service
+        // étranger. Trois raisons, dans l'ordre où elles mordent :
+        //
+        //   · la politique d'usage d'OpenStreetMap proscrit l'usage
+        //     systématique par une application — un système en production
+        //     s'y ferait bloquer ;
+        //   · chaque affichage enverrait à un tiers l'adresse de l'agent et
+        //     les coordonnées consultées, soit où et quand la commune
+        //     inspecte ;
+        //   · sans lien international, la carte serait blanche — et à Dakar
+        //     ce lien n'est pas garanti.
+        //
+        // Les DONNÉES restent celles d'OpenStreetMap : ce sont les tuiles
+        // qui sont générées et servies localement, d'où l'attribution.
+        L.tileLayer(URL_TUILES, {
           maxZoom: 19,
           // Attribution obligatoire : OpenStreetMap est sous licence ODbL.
-          attribution: '&copy; contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          attribution: '&copy; contributeurs <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> — tuiles servies par la commune',
         }).addTo(carte.current);
 
         setPret(true);
       } catch (err) {
         setErreur(
-          'La carte n\'a pas pu être chargée. Vérifiez que le serveur accède bien '
-          + 'à openstreetmap.org — c\'est le seul appel sortant du tableau de bord.',
+          'La carte n\'a pas pu être chargée. Vérifiez que le serveur de tuiles '
+          + 'de la commune répond — voir NEXT_PUBLIC_TUILES_URL.',
         );
       }
     })();

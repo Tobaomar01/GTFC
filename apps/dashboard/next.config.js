@@ -28,13 +28,15 @@ const nextConfig = {
       headers: [
         { key: 'X-Content-Type-Options', value: 'nosniff' },
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-        // La carte charge ses tuiles depuis OpenStreetMap ; tout le reste est
-        // servi localement. Aucune autre origine n'est autorisée.
+        // Tout est servi localement, tuiles cartographiques comprises.
+        // Aucune origine externe n'est autorisée : la politique le dit, et
+        // le navigateur le fait respecter même si un développeur réintroduit
+        // par mégarde une URL distante.
         {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self'",
-            "img-src 'self' data: blob: https://*.tile.openstreetmap.org",
+            "img-src 'self' data: blob:",
             "style-src 'self' 'unsafe-inline'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
             "connect-src 'self'",

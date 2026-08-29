@@ -11,6 +11,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { couleurs, espacements, rayons, typographie, CIBLE_TACTILE, formaterDelai } from '../theme';
 import { Bouton, Champ, Message, stylesUi } from './ui';
+import CartePosition from './carte-position';
 import {
   releverPosition, qualitePosition, suggererQuartier, PRECISION_ACCEPTABLE_M,
 } from '../services/localisation';
@@ -66,7 +67,7 @@ export function BandeauEtat() {
 // ===========================================================================
 //  Relevé de position
 // ===========================================================================
-export function ReleveurPosition({ position, onPosition, obligatoire = true }) {
+export function ReleveurPosition({ position, onPosition, obligatoire = true, urlTuiles = null }) {
   const [enCours, setEnCours] = useState(false);
   const [etat, setEtat] = useState(null);
   const [erreur, setErreur] = useState(null);
@@ -134,6 +135,16 @@ export function ReleveurPosition({ position, onPosition, obligatoire = true }) {
           variante="secondaire"
         />
       )}
+
+      {/* Le GPS ne suffit pas à désigner UNE devanture parmi dix : la carte
+          laisse l'agent poser le point là où il voit la boutique. */}
+      {position ? (
+        <CartePosition
+          position={position}
+          urlTuiles={urlTuiles}
+          onAjuste={(p) => onPosition({ ...position, ...p }, suggestion)}
+        />
+      ) : null}
 
       {enCours && etat ? (
         <Text style={[typographie.petit, { marginTop: espacements.s }]}>

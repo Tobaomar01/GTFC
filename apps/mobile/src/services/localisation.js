@@ -15,7 +15,17 @@ import * as Location from 'expo-location';
 import { distanceMetres } from '../bdd/commerces.repo';
 import { lireReferentiel } from '../bdd/sync.repo';
 
-/** Au-delà, la position n'est pas exploitable pour situer une devanture. */
+/**
+ * Seuil d'arrêt de la recherche de signal, non seuil de qualité finale.
+ *
+ * Trente mètres ne suffisent pas à désigner UNE devanture parmi dix : c'est
+ * pourquoi l'agent ajuste ensuite le point sur la carte (voir
+ * composants/carte-position.js). Le GPS sert à centrer la vue, l'œil de
+ * l'agent fait le reste.
+ *
+ * Durcir ce seuil serait contre-productif : sous les tôles d'un marché, un
+ * téléphone ne l'atteindrait jamais et le recensement s'arrêterait.
+ */
 export const PRECISION_ACCEPTABLE_M = 30;
 export const PRECISION_MEDIOCRE_M = 60;
 

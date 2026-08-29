@@ -252,7 +252,11 @@ export function RecensementEcran({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         {/* ---------------- Position ---------------- */}
-        <ReleveurPosition position={position} onPosition={surPosition} />
+        <ReleveurPosition
+          position={position}
+          onPosition={surPosition}
+          urlTuiles={process.env.EXPO_PUBLIC_TUILES_URL ?? null}
+        />
 
         {/* ---------------- Doublons potentiels ---------------- */}
         {voisins.length > 0 ? (
