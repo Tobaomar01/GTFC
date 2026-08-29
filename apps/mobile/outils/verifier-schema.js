@@ -71,7 +71,7 @@ async function principal() {
   )[0].values.flat();
 
   const attendues = ['commerce', 'commerce_taxe', 'journal_local', 'meta', 'operation_sync',
-    'paiement', 'photo_locale', 'position_agent', 'referentiel', 'visite'];
+    'paiement', 'photo_locale', 'referentiel', 'visite'];
   for (const t of attendues) {
     verifier(`Table ${t}`, tables.includes(t), `tables trouvées : ${tables.join(', ')}`);
   }

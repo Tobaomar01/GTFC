@@ -204,7 +204,7 @@ UPDATE app.avis_imposition
 --      ~40 % impayés              -> rouge
 -- ---------------------------------------------------------------------------
 -- Les tirages aléatoires sont figés dans une CTE : le moyen de paiement doit
--- être connu AVANT l'insertion, car la contrainte paiement_especes_tracable
+-- être connu AVANT l'insertion (contrainte historique, levée en 0041)
 -- exige un agent identifié dès qu'il s'agit d'espèces.
 WITH candidats AS (
     SELECT a.id AS avis_id, a.commune_id, a.commerce_id, a.numero, a.montant_total,
@@ -230,7 +230,7 @@ SELECT
          THEN montant_total                                     -- règlement complet
          ELSE greatest(app.arrondir_xof(montant_total * 0.4), 1) END,
     CASE WHEN tirage_moyen < 0.8 THEN 'wave'::app.moyen_paiement
-         ELSE 'especes'::app.moyen_paiement END,
+         ELSE 'wave'::app.moyen_paiement END,
     now() - (tirage_date * 10 || ' days')::interval,
     CASE WHEN tirage_moyen >= 0.8 THEN agent_recenseur_id END,
     telephone_paiement,

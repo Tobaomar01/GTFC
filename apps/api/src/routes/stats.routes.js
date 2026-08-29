@@ -91,14 +91,6 @@ router.get('/stats/agents',
     return ok(res, { periode: { depuis, jusqua }, agents: rows });
   }));
 
-/** Encaissements en espèces non encore versés en caisse. */
-router.get('/stats/especes-non-versees', exigerRole('superviseur'),
-  asyncHandler(async (req, res) => {
-    const { rows } = await requete(req.contexte,
-      'SELECT * FROM app.v_especes_non_versees ORDER BY anciennete_jours DESC');
-    return ok(res, rows);
-  }));
-
 /** Contrôles de cohérence métier — à consulter avant chaque facturation. */
 router.get('/stats/coherence', exigerRole('superviseur'), asyncHandler(async (req, res) => {
   const [controles, provisoires] = await Promise.all([

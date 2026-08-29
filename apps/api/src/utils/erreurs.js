@@ -94,9 +94,13 @@ function depuisErreurPostgres(err) {
       return erreurs.conflit('Cet enregistrement existe déjà', { contrainte });
 
     case '23514': // check_violation
-      if (contrainte.includes('especes_tracable')) {
+      if (contrainte.includes('moyen_wave_seulement')) {
         return erreurs.requeteInvalide(
-          'Un encaissement en espèces doit indiquer l\'agent qui a reçu l\'argent');
+          'Wave est le seul moyen de paiement accepté.');
+      }
+      if (contrainte.includes('double_verification')) {
+        return erreurs.conflit(
+          "Une décision dérogatoire doit être validée par une personne distincte de son auteur.");
       }
       if (contrainte.includes('pas_de_surpaiement')) {
         return erreurs.requeteInvalide('Le montant payé dépasse le montant dû');

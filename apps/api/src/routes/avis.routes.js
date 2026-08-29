@@ -246,7 +246,7 @@ router.post('/avis/:id/lien-paiement',
 router.get('/paiements',
   valider(pagination.extend({
     commerce_id: uuid.optional(),
-    moyen: z.enum(['wave', 'especes', 'virement', 'cheque', 'compensation']).optional(),
+    moyen: z.literal('wave').optional(),
     agent_id: uuid.optional(),
     depuis: z.coerce.date().optional(),
     jusqua: z.coerce.date().optional(),
@@ -269,9 +269,6 @@ router.get('/paiements',
         conditions.push(`${colonne} ${op} $${params.length}`);
       }
     }
-    if (req.query.non_verses) {
-      conditions.push("p.moyen = 'especes' AND p.verse_en_caisse_le IS NULL");
-    }
     const where = conditions.join(' AND ');
 
     const { rows: total } = await requete(req.contexte,
@@ -280,13 +277,12 @@ router.get('/paiements',
 
     params.push(p.limite, p.decalage);
     const { rows } = await requete(req.contexte, `
-      SELECT p.id, p.reference, p.montant, p.moyen, p.paye_le, p.verse_en_caisse_le,
+      SELECT p.id, p.reference, p.montant, p.moyen, p.paye_le,
              c.code AS commerce_code, c.enseigne, a.numero AS avis_numero,
-             u.nom_complet AS encaisse_par, q.numero AS quittance_numero
+             q.numero AS quittance_numero
         FROM app.paiement p
         JOIN app.commerce c ON c.id = p.commerce_id
         LEFT JOIN app.avis_imposition a ON a.id = p.avis_id
-        LEFT JOIN app.utilisateur u ON u.id = p.encaisse_par
         LEFT JOIN app.quittance q ON q.paiement_id = p.id
        WHERE ${where}
        ORDER BY p.paye_le DESC
@@ -308,7 +304,7 @@ router.post('/paiements',
     commerce_id: uuid,
     avis_id: uuid.optional(),
     montant: montantXof.refine((v) => v > 0, 'Le montant doit être supérieur à zéro'),
-    moyen: z.enum(['especes', 'virement', 'cheque', 'compensation']).default('especes'),
+    moyen: z.literal('wave').default('wave'),
     reference: texteCourt(60).optional(),
     telephone_payeur: telephone.optional(),
     commentaire: z.string().max(500).optional(),
@@ -327,14 +323,14 @@ router.post('/paiements',
       const { rows } = await client.query(`
         INSERT INTO app.paiement (
           commune_id, commerce_id, avis_id, reference, montant, moyen,
-          paye_le, encaisse_par, geom, telephone_payeur, commentaire, cree_par
-        ) VALUES ($1,$2,$3,$4,$5,$6, COALESCE($7::timestamptz, now()), $8,
-                  app.point_gps($9,$10), $11, $12, $8)
+          paye_le, geom, telephone_payeur, commentaire, cree_par
+        ) VALUES ($1,$2,$3,$4,$5,$6, COALESCE($7::timestamptz, now()),
+                  app.point_gps($8,$9), $10, $11, $12)
         RETURNING id, reference, montant, moyen, paye_le`,
       [req.utilisateur.communeId, b.commerce_id, b.avis_id ?? null, reference,
-        b.montant, b.moyen, b.paye_le ?? null, req.utilisateur.id,
+        b.montant, b.moyen, b.paye_le ?? null,
         b.longitude ?? null, b.latitude ?? null,
-        b.telephone_payeur ?? null, b.commentaire ?? null]);
+        b.telephone_payeur ?? null, b.commentaire ?? null, req.utilisateur.id]);
 
       // Quittance : jeton de vérification aléatoire, encodé dans le QR imprimé
       const { rows: jeton } = await client.query('SELECT app.code_aleatoire(16) AS j');
@@ -351,21 +347,14 @@ router.post('/paiements',
     return cree(res, resultat);
   }));
 
-/** Versement en caisse : rapprochement des espèces collectées sur le terrain. */
-router.post('/paiements/verser',
-  exigerRole('superviseur'),
-  valider(z.object({ paiement_ids: z.array(uuid).min(1).max(500) })),
-  asyncHandler(async (req, res) => {
-    const { rows } = await requete(req.contexte, `
-      UPDATE app.paiement
-         SET verse_en_caisse_le = now(), verse_recu_par = $2
-       WHERE id = ANY($1::uuid[]) AND moyen = 'especes'
-         AND verse_en_caisse_le IS NULL AND annule_le IS NULL
-       RETURNING id, reference, montant`, [req.body.paiement_ids, req.utilisateur.id]);
-
-    const total = rows.reduce((s, r) => s + Number(r.montant), 0);
-    return ok(res, { nb_verses: rows.length, montant_total: total, paiements: rows });
-  }));
+/*
+ * L'endpoint de versement en caisse a été retiré (FR-025b, FR-030).
+ *
+ * Wave est l'unique moyen de paiement du pilote : aucune somme ne transite
+ * par un agent, il n'y a donc plus de caisse à rapprocher. Le dispositif
+ * précédent — vue des sommes non versées, contrainte nominative — était bien
+ * conçu, mais il rendait le détournement visible plutôt qu'impossible.
+ */
 
 router.post('/paiements/:id/annuler',
   exigerRole('admin_commune'),

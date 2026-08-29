@@ -81,7 +81,7 @@ INSERT INTO app.commune_parametre (
     rayon_tolerance_gps_m,
     photo_devanture_obligatoire, photo_todp_obligatoire,
     objectif_visites_jour_agent,
-    encaissement_especes_autorise,
+    encaissement_especes_autorise,  -- forcé à false depuis 0041
     a_remplacer
 ) VALUES (
     v_commune_id, 'XOF',

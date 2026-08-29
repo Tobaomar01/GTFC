@@ -78,10 +78,6 @@ export const STATUTS_COMMERCE = {
 
 export const MOYENS_PAIEMENT = {
   wave: 'Wave',
-  especes: 'Espèces',
-  virement: 'Virement',
-  cheque: 'Chèque',
-  compensation: 'Compensation',
 };
 
 export const ACTIONS_AUDIT = {

@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS paiement (
   avis_id         TEXT,
   reference       TEXT NOT NULL UNIQUE,
   montant         INTEGER NOT NULL,
-  moyen           TEXT NOT NULL DEFAULT 'especes',
+  moyen           TEXT NOT NULL DEFAULT 'wave',
   telephone_payeur TEXT,
   commentaire     TEXT,
   longitude       REAL,
@@ -215,23 +215,8 @@ CREATE TABLE IF NOT EXISTS operation_sync (
 CREATE INDEX IF NOT EXISTS idx_op_en_attente ON operation_sync (statut, id);
 CREATE INDEX IF NOT EXISTS idx_op_local      ON operation_sync (identifiant_local);
 
--- ---------------------------------------------------------------------------
--- Positions relevées pendant la tournée
--- Purgées après envoi : leur intérêt est le suivi temps réel, pas l'archive
--- locale. C'est le serveur qui les conserve.
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS position_agent (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  longitude       REAL NOT NULL,
-  latitude        REAL NOT NULL,
-  precision_gps_m REAL,
-  vitesse_kmh     REAL,
-  batterie_pct    INTEGER,
-  releve_le       TEXT NOT NULL,
-  envoyee         INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS idx_position_a_envoyer ON position_agent (envoyee, id);
+-- Le suivi de position des agents a été retiré (FR-051a, FR-051b).
+DROP TABLE IF EXISTS position_agent;
 
 -- ---------------------------------------------------------------------------
 -- Journal local — diagnostic sur le terrain

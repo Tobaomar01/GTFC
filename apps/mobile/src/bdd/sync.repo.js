@@ -164,27 +164,15 @@ export const oublierPhoto = (idLocal) => executer(
   'DELETE FROM photo_locale WHERE id_local = ?', [idLocal],
 );
 
-// ---------------------------------------------------------------------------
-// Positions
-// ---------------------------------------------------------------------------
-export const enregistrerPosition = ({ longitude, latitude, precision, vitesse, batterie }) => executer(
-  `INSERT INTO position_agent (longitude, latitude, precision_gps_m, vitesse_kmh,
-                               batterie_pct, releve_le)
-   VALUES (?,?,?,?,?,?)`,
-  [longitude, latitude, precision ?? null, vitesse ?? null, batterie ?? null, maintenant()],
-);
-
-export const positionsEnAttente = (limite = 200) => lireTout(
-  'SELECT * FROM position_agent WHERE envoyee = 0 ORDER BY id LIMIT ?', [limite],
-);
-
-export async function confirmerPositions(ids) {
-  if (ids.length === 0) return;
-  // Purge directe : contrairement au reste, une position perdue est sans
-  // conséquence — c'est du confort de supervision, pas une donnée fiscale.
-  await executer(
-    `DELETE FROM position_agent WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
-}
+/*
+ * Le suivi de position des agents a été retiré (FR-051a, FR-051b, SC-029).
+ *
+ * Géolocaliser des employés en continu relève de la loi 2008-12 : cela
+ * exige une justification, une proportionnalité et l'information des
+ * intéressés. Seules subsistent les positions rattachées à une fiche
+ * recensée ou à une visite — celles-là situent une devanture, elles ne
+ * surveillent personne.
+ */
 
 // ---------------------------------------------------------------------------
 // Visites et paiements confirmés

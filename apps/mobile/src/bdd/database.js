@@ -183,7 +183,6 @@ export async function reinitialiser({ forcer = false } = {}) {
   await db.execAsync(`
     DELETE FROM operation_sync;
     DELETE FROM photo_locale;
-    DELETE FROM position_agent;
     DELETE FROM paiement;
     DELETE FROM visite;
     DELETE FROM commerce_taxe;

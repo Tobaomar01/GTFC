@@ -335,7 +335,7 @@ router.get('/exports/paiements.xlsx',
   valider(z.object({
     depuis: z.coerce.date().optional(),
     jusqua: z.coerce.date().optional(),
-    moyen: z.enum(['wave', 'especes', 'virement', 'cheque', 'compensation']).optional(),
+    moyen: z.literal('wave').optional(),
   }), 'query'),
   asyncHandler(async (req, res) => {
     const resultat = await exports_.paiementsExcel(await contexteEnrichi(req), req.query);

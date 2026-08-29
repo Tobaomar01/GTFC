@@ -362,7 +362,7 @@ export async function enregistrerPaiement(donnees) {
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     [idLocal, donnees.commerce_local ?? null, donnees.commerce_id ?? null,
       donnees.avis_id ?? null, reference, Math.round(donnees.montant),
-      donnees.moyen ?? 'especes', donnees.telephone_payeur ?? null,
+      donnees.moyen ?? 'wave', donnees.telephone_payeur ?? null,
       donnees.commentaire ?? null, donnees.longitude ?? null,
       donnees.latitude ?? null, donnees.paye_le ?? ts]);
 
@@ -376,7 +376,7 @@ export async function enregistrerPaiement(donnees) {
       avis_id: donnees.avis_id ?? null,
       reference,
       montant: Math.round(donnees.montant),
-      moyen: donnees.moyen ?? 'especes',
+      moyen: donnees.moyen ?? 'wave',
       telephone_payeur: donnees.telephone_payeur ?? null,
       commentaire: donnees.commentaire ?? null,
       longitude: donnees.longitude ?? null,

@@ -5,7 +5,6 @@
  *   1. reprise des opérations interrompues par une coupure précédente ;
  *   2. envoi des opérations en attente, par lots ;
  *   3. envoi des photos (elles attendent l'identifiant serveur du commerce) ;
- *   4. envoi des positions relevées pendant la tournée ;
  *   5. téléchargement du delta serveur (référentiels + commerces modifiés).
  *
  * L'ordre compte : on ENVOIE avant de RECEVOIR. Recevoir d'abord risquerait
@@ -40,7 +39,7 @@ export async function synchroniser({ surProgression = () => {}, forcer = false }
 
   const bilan = {
     envoyees: 0, conflits: 0, rejetees: 0,
-    photos: 0, photos_echouees: 0, positions: 0,
+    photos: 0, photos_echouees: 0,
     recus: 0, mis_a_jour: 0, erreurs: [],
   };
 
@@ -66,8 +65,6 @@ export async function synchroniser({ surProgression = () => {}, forcer = false }
     bilan.photos_echouees = resultatPhotos.echouees;
 
     // --- 4. Positions -----------------------------------------------------
-    const positions = await envoyerPositions();
-    bilan.positions = positions;
 
     // --- 5. Réception -----------------------------------------------------
     surProgression({ phase: 'reception', message: 'Mise à jour des données…' });
@@ -323,44 +320,6 @@ async function envoyerPhotos(surProgression) {
   }
 
   return { envoyees, echouees };
-}
-
-// ---------------------------------------------------------------------------
-// Positions
-// ---------------------------------------------------------------------------
-async function envoyerPositions() {
-  const positions = await sync.positionsEnAttente(200);
-  if (positions.length === 0) return 0;
-
-  const lot = {
-    identifiant_client: Crypto.randomUUID(),
-    operations: positions.map((p) => ({
-      entite: 'position',
-      operation: 'creation',
-      identifiant_local: `pos-${p.id}`,
-      horodatage_client: p.releve_le,
-      donnees: {
-        longitude: p.longitude,
-        latitude: p.latitude,
-        precision_gps_m: p.precision_gps_m,
-        vitesse_kmh: p.vitesse_kmh,
-        batterie_pct: p.batterie_pct,
-        releve_le: p.releve_le,
-      },
-    })),
-  };
-
-  try {
-    await api.envoyerLot(lot);
-    await sync.confirmerPositions(positions.map((p) => p.id));
-    return positions.length;
-  } catch (err) {
-    // Une position perdue est sans conséquence : c'est du confort de
-    // supervision, pas une donnée fiscale. On n'interrompt pas pour autant.
-    if (err.duReseau) throw err;
-    await journaliser('avertissement', 'Positions non envoyées', { message: err.message });
-    return 0;
-  }
 }
 
 // ---------------------------------------------------------------------------

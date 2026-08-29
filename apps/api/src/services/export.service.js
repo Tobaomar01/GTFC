@@ -334,10 +334,10 @@ async function paiementsExcel(contexte, filtres = {}) {
   params.push(PLAFOND);
 
   const { rows } = await requete(contexte, `
-    SELECT p.reference, p.montant, p.moyen, p.paye_le, p.verse_en_caisse_le,
+    SELECT p.reference, p.montant, p.moyen, p.paye_le,
            c.code AS commerce_code, c.enseigne, z.nom AS zone, q.nom AS quartier,
            a.numero AS avis, pf.code AS periode,
-           u.nom_complet AS encaisse_par, qt.numero AS quittance,
+           qt.numero AS quittance,
            t.wave_session_id, t.wave_transaction_id
       FROM app.paiement p
       JOIN app.commerce c ON c.id = p.commerce_id
@@ -345,7 +345,6 @@ async function paiementsExcel(contexte, filtres = {}) {
       JOIN app.quartier q ON q.id = c.quartier_id
       LEFT JOIN app.avis_imposition a ON a.id = p.avis_id
       LEFT JOIN app.periode_fiscale pf ON pf.id = a.periode_id
-      LEFT JOIN app.utilisateur u ON u.id = p.encaisse_par
       LEFT JOIN app.quittance qt ON qt.paiement_id = p.id
       LEFT JOIN app.transaction_wave t ON t.paiement_id = p.id
      WHERE ${conditions.join(' AND ')}
@@ -366,15 +365,12 @@ async function paiementsExcel(contexte, filtres = {}) {
     { header: 'Avis', key: 'avis', width: 22 },
     { header: 'Moyen', key: 'moyen', width: 12 },
     { header: 'Montant', key: 'montant', width: 14 },
-    { header: 'Encaissé par', key: 'agent', width: 24 },
-    { header: 'Versé en caisse', key: 'verse', width: 18 },
     { header: 'Quittance', key: 'quittance', width: 26 },
     { header: 'Transaction Wave', key: 'wave', width: 30 },
   ]);
 
   const moyens = {
-    wave: 'Wave', especes: 'Espèces', virement: 'Virement',
-    cheque: 'Chèque', compensation: 'Compensation',
+    wave: 'Wave',
   };
 
   for (const p of rows) {
@@ -389,11 +385,6 @@ async function paiementsExcel(contexte, filtres = {}) {
       avis: p.avis ?? '',
       moyen: moyens[p.moyen] ?? p.moyen,
       montant: montantXof(p.montant),
-      agent: p.encaisse_par ?? '',
-      // Colonne critique du contrôle anti-détournement : un encaissement en
-      // espèces non versé saute aux yeux.
-      verse: p.moyen !== 'especes' ? '—'
-        : (p.verse_en_caisse_le ? new Date(p.verse_en_caisse_le) : 'NON VERSÉ'),
       quittance: p.quittance ?? '',
       wave: p.wave_transaction_id ?? p.wave_session_id ?? '',
     });

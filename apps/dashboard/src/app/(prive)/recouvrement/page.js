@@ -233,16 +233,6 @@ export default function PageRecouvrement() {
               { cle: 'moyen', titre: 'Moyen', rendu: (l) => MOYENS_PAIEMENT[l.moyen] ?? l.moyen },
               { cle: 'montant', titre: 'Montant', alignement: 'droite', rendu: (l) => xof(l.montant) },
               {
-                cle: 'verse_en_caisse_le',
-                titre: 'Versé en caisse',
-                rendu: (l) => {
-                  if (l.moyen !== 'especes') return '—';
-                  return l.verse_en_caisse_le
-                    ? date(l.verse_en_caisse_le)
-                    : <span style={{ color: 'var(--st-impaye)', fontWeight: 600 }}>Non versé</span>;
-                },
-              },
-              {
                 cle: 'quittance_numero',
                 titre: 'Quittance',
                 rendu: (l) => (l.quittance_numero

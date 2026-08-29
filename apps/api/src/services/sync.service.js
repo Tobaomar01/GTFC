@@ -207,7 +207,7 @@ async function traiterPaiement(client, op, contexte) {
     RETURNING id`,
   [
     contexte.communeId, d.commerce_id, d.avis_id ?? null, d.reference,
-    d.montant, d.moyen ?? 'especes', d.paye_le ?? new Date(),
+    d.montant, d.moyen ?? 'wave', d.paye_le ?? new Date(),
     contexte.utilisateurId, d.longitude ?? null, d.latitude ?? null,
     d.telephone_payeur ?? null, d.commentaire ?? null,
   ]);
@@ -322,22 +322,20 @@ async function traiterChantier(client, op, contexte) {
   return { statut: 'traite', entite_id: ligne.id, code: ligne.code };
 }
 
-async function traiterPosition(client, op, contexte) {
-  const d = op.donnees;
-  await client.query(`
-    INSERT INTO app.position_agent
-      (commune_id, agent_id, geom, precision_gps_m, vitesse_kmh, batterie_pct, releve_le, hors_ligne)
-    VALUES ($1, $2, app.point_gps($3, $4), $5, $6, $7, $8, true)`,
-  [contexte.communeId, contexte.utilisateurId, d.longitude, d.latitude,
-    d.precision_gps_m ?? null, d.vitesse_kmh ?? null, d.batterie_pct ?? null, d.releve_le]);
-  return { statut: 'traite' };
-}
+/*
+ * Le suivi de position des agents a été retiré (FR-051a, FR-051b, SC-029).
+ *
+ * Géolocaliser des employés en continu relève de la loi 2008-12 : cela
+ * exige une justification, une proportionnalité et l'information des
+ * intéressés. Seules subsistent les positions rattachées à une fiche
+ * recensée ou à une visite — celles-là situent une devanture, elles ne
+ * surveillent personne.
+ */
 
 const AIGUILLAGE = {
   commerce: traiterCommerce,
   visite: traiterVisite,
   paiement: traiterPaiement,
-  position: traiterPosition,
   affichage: traiterAffichage,
   chantier: traiterChantier,
 };

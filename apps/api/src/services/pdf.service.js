@@ -204,8 +204,7 @@ async function construireQuittance(donnees) {
   // --- Modalités -----------------------------------------------------------
   doc.fontSize(8).fillColor(GRIS);
   const moyens = {
-    wave: 'Wave', especes: 'Espèces', virement: 'Virement',
-    cheque: 'Chèque', compensation: 'Compensation',
+    wave: 'Wave',
   };
   doc.text(`Moyen de paiement : ${moyens[paiement.moyen] ?? paiement.moyen}`, 32, y);
   y += 10;

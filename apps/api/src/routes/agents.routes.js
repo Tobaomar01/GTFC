@@ -248,18 +248,13 @@ router.get('/:id/activite',
     const depuis = req.query.depuis ?? new Date(Date.now() - 30 * 86400000);
     const jusqua = req.query.jusqua ?? new Date();
 
-    const [journees, especes] = await Promise.all([
-      requete(req.contexte, `
+    const journees = await requete(req.contexte, `
         SELECT journee, nb_visites, nb_enregistrements, nb_encaissements,
                nb_commerces_distincts, duree_moyenne_s, nb_visites_eloignees,
                premiere_visite, derniere_visite
           FROM app.v_activite_agent
          WHERE agent_id = $1 AND journee BETWEEN $2::date AND $3::date
-         ORDER BY journee DESC`, [req.params.id, depuis, jusqua]),
-      requete(req.contexte, `
-        SELECT nb_paiements, montant_total, plus_ancien, anciennete_jours
-          FROM app.v_especes_non_versees WHERE agent_id = $1`, [req.params.id]),
-    ]);
+         ORDER BY journee DESC`, [req.params.id, depuis, jusqua]);
 
     return ok(res, {
       periode: { depuis, jusqua },
@@ -268,19 +263,13 @@ router.get('/:id/activite',
     });
   }));
 
-/** Dernières positions connues — suivi temps réel du dashboard. */
-router.get('/positions/dernieres', exigerRole('superviseur'), asyncHandler(async (req, res) => {
-  const { rows } = await requete(req.contexte, `
-    SELECT DISTINCT ON (p.agent_id)
-           p.agent_id, u.nom_complet AS agent,
-           ST_X(p.geom) AS longitude, ST_Y(p.geom) AS latitude,
-           p.releve_le, p.batterie_pct, p.precision_gps_m,
-           EXTRACT(EPOCH FROM (now() - p.releve_le))::int AS anciennete_s
-      FROM app.position_agent p
-      JOIN app.utilisateur u ON u.id = p.agent_id
-     WHERE p.releve_le > now() - interval '12 hours'
-     ORDER BY p.agent_id, p.releve_le DESC`);
-  return ok(res, rows);
-}));
+/*
+ * Le suivi de position des agents a été retiré (FR-051a, FR-051b).
+ *
+ * Géolocaliser des employés en continu relève de la loi 2008-12 : cela
+ * exige une justification, une proportionnalité et l'information des
+ * intéressés. Le commanditaire l'a écarté. Seules subsistent les positions
+ * rattachées à une fiche recensée ou à une visite.
+ */
 
 module.exports = router;

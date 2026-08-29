@@ -128,7 +128,6 @@ router.patch('/communes/:id/parametres',
     photo_devanture_obligatoire: z.boolean().optional(),
     photo_todp_obligatoire: z.boolean().optional(),
     objectif_visites_jour_agent: z.coerce.number().int().min(0).max(200).optional(),
-    encaissement_especes_autorise: z.boolean().optional(),
     a_remplacer: z.boolean().optional(),
   })),
   asyncHandler(async (req, res) => {

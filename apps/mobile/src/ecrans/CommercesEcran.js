@@ -489,7 +489,7 @@ export function EncaissementEcran({ route, navigation }) {
                 commerce_local: idLocal,
                 commerce_id: commerce.id_serveur,
                 montant: valeur,
-                moyen: 'especes',
+                moyen: 'wave',
                 telephone_payeur: commerce.telephone_paiement,
                 commentaire: commentaire || null,
                 longitude: position?.longitude,
