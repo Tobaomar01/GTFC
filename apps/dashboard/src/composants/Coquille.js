@@ -25,7 +25,10 @@ const PAGES = [
   // administrateur en plus fort » : il détient les décisions dérogatoires
   // que personne d'autre n'a. Les ranger sur une échelle donnerait ce
   // pouvoir à l'administrateur (Constitution III).
-  { href: '/derogations', libelle: 'Dérogations', icone: '⚑', roleExact: 'chef_projet' },
+  // Les deux parties à la décision : l'exploitant qui saisit, la municipalité
+  // qui valide. Rôles exacts, jamais un niveau — les ranger sur une échelle
+  // donnerait la remise de dette au super-administrateur.
+  { href: '/derogations', libelle: 'Dérogations', icone: '⚑', rolesExacts: ['chef_projet', 'maire'] },
 ];
 
 export default function Coquille({ children }) {
@@ -53,8 +56,8 @@ export default function Coquille({ children }) {
   };
 
   // Un rôle exact ne se compare pas à un niveau : il correspond, ou pas.
-  const pages = PAGES.filter((p) => (p.roleExact
-    ? profil?.role === p.roleExact
+  const pages = PAGES.filter((p) => (p.rolesExacts
+    ? p.rolesExacts.includes(profil?.role)
     : auMoins(profil?.role ?? 'agent', p.role)));
 
   return (

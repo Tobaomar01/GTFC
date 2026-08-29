@@ -2,9 +2,21 @@
  * Décisions dérogatoires — /derogations
  *
  * Montant forcé et exonération sont les deux façons d'effacer une dette.
- * Elles partagent donc le même registre et la même règle : deux chefs de
- * projet distincts, l'un qui saisit, l'autre qui valide (Constitution III,
- * FR-020c à FR-020e, FR-020j, FR-020k).
+ * Elles partagent le même registre et la même règle : l'un saisit, un AUTRE
+ * valide (Constitution III, FR-020c à FR-020e, FR-020j, FR-020k).
+ *
+ * La double vérification traverse les deux organisations, et ce n'est pas un
+ * détail d'organigramme.
+ *
+ *   · le CHEF DE PROJET, côté exploitant, SAISIT. C'est lui qui a la main sur
+ *     l'outil, qui instruit le dossier et qui en connaît les pièces ;
+ *   · le MAIRE, côté municipalité, VALIDE. Remettre une dette publique est un
+ *     acte de la commune. La constitution interdit à l'exploitant technique du
+ *     partenariat tout droit sur les échéances (principe III) : lui laisser
+ *     conclure seul reviendrait à lui donner ce droit.
+ *
+ * Aucune des deux parties ne peut donc effacer une dette à elle seule. Tant
+ * que la validation manque, la décision n'a aucun effet sur les montants.
  *
  * Tant que la validation manque, la décision n'a AUCUN effet sur les
  * montants : le calcul n'interroge que les vues v_montant_force_opposable et
@@ -22,7 +34,9 @@ const { requete } = require('../config/database');
 const { erreurs } = require('../utils/erreurs');
 const { ok, cree, asyncHandler } = require('../utils/reponse');
 const { valider, paramsId, uuid, texteCourt, montantXof } = require('../middleware/validation');
-const { authentifier, exigerCommune, exigerChefProjet } = require('../middleware/auth');
+const {
+  authentifier, exigerCommune, exigerChefProjet, exigerRole,
+} = require('../middleware/auth');
 const { limiteEcriture } = require('../middleware/limites');
 
 const router = express.Router();
@@ -38,7 +52,9 @@ router.use(authentifier, exigerCommune);
 // GET /derogations — le registre, réservé aux chefs de projet (FR-020k)
 // ---------------------------------------------------------------------------
 router.get('/derogations',
-  exigerChefProjet,
+  // Les deux parties à la décision, et elles seules : celui qui saisit et
+  // celui qui valide. Le registre recense des remises de dette nominatives.
+  exigerRole(['chef_projet', 'maire']),
   valider(z.object({
     depuis: z.coerce.date().optional(),
     jusqua: z.coerce.date().optional(),
@@ -112,7 +128,10 @@ router.post('/derogations/montant-force',
 // ---------------------------------------------------------------------------
 router.post('/derogations/:id/validation',
   limiteEcriture,
-  exigerChefProjet,
+  // La validation appartient à la municipalité. C'est la seule écriture par
+  // laquelle le maire engage la commune, et elle ne fait que confirmer une
+  // décision préparée par l'exploitant.
+  exigerRole(['maire']),
   valider(paramsId, 'params'),
   asyncHandler(async (req, res) => {
     const { rows: existantes } = await requete(req.contexte,
@@ -144,7 +163,7 @@ router.post('/derogations/:id/validation',
 // ---------------------------------------------------------------------------
 router.post('/exonerations/:id/validation',
   limiteEcriture,
-  exigerChefProjet,
+  exigerRole(['maire']),
   valider(paramsId, 'params'),
   asyncHandler(async (req, res) => {
     const { rows: existantes } = await requete(req.contexte,

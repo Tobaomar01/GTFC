@@ -33,15 +33,16 @@ const NIVEAU = {
 };
 
 /**
- * Rôles en LECTURE SEULE, quelle que soit la route.
+ * Rôles en LECTURE SEULE, sauf exception nommée ci-dessous.
  *
- * Le maire constate la recette de sa commune ; il ne recense pas, n'encaisse
- * pas, ne remet pas de dette et ne modifie pas le barème — celui-ci relève
- * d'une délibération du conseil municipal, pas d'un écran.
+ * Le maire constate la recette de sa commune. Il ne recense pas, n'encaisse
+ * pas et ne modifie pas le barème — celui-ci relève d'une délibération du
+ * conseil municipal, pas d'un écran.
  *
- * La règle est posée UNE FOIS, au niveau de l'application, et non route par
- * route : un garde oublié sur une route neuve rouvrirait la porte en silence,
- * et personne ne s'en apercevrait avant qu'une écriture n'ait eu lieu.
+ * La règle est posée UNE FOIS, au niveau de l'authentification, et non route
+ * par route : un garde oublié sur une route neuve rouvrirait la porte en
+ * silence, et personne ne s'en apercevrait avant qu'une écriture n'ait eu
+ * lieu.
  */
 const LECTURE_SEULE = new Set(['maire']);
 
@@ -49,15 +50,50 @@ const LECTURE_SEULE = new Set(['maire']);
 const METHODES_LECTURE = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /**
- * Refuse toute écriture aux rôles de consultation.
+ * Les écritures qu'un profil de consultation garde malgré tout.
  *
- * Placé après `authentifier` et avant les routes. Les requêtes anonymes
- * passent : ce sont les gardes de chaque route qui les traitent.
+ * Deux familles, et l'inventaire tient volontairement en quelques lignes :
+ * tout ce qui n'y figure pas est refusé, et une route neuve l'est par défaut.
+ *
+ *   · ce sans quoi le compte est inutilisable — changer son mot de passe,
+ *     alors que tous les comptes y sont contraints à la première connexion.
+ *     L'oubli de cette ligne enfermait le maire dehors ;
+ *   · la VALIDATION d'une décision dérogatoire. Remettre une dette publique
+ *     est un acte de la municipalité, pas de l'exploitant technique du
+ *     partenariat, à qui la constitution interdit tout droit sur les
+ *     échéances (principe III). C'est la seule écriture par laquelle le maire
+ *     engage la commune, et elle ne fait jamais que confirmer une décision
+ *     préparée par quelqu'un d'autre — la base refuse qu'un même agent
+ *     saisisse et valide.
+ */
+const UUID = '[0-9a-fA-F-]{36}';
+const ECRITURES_AUTORISEES = {
+  maire: [
+    { methode: 'POST', chemin: /^\/auth\/mot-de-passe$/ },
+    { methode: 'POST', chemin: new RegExp(`^/derogations/${UUID}/validation$`) },
+    { methode: 'POST', chemin: new RegExp(`^/exonerations/${UUID}/validation$`) },
+  ],
+};
+
+/**
+ * Refuse toute écriture aux rôles de consultation, hors exceptions nommées.
+ *
+ * Appelé depuis `authentifier`, donc sur toute route protégée. Les requêtes
+ * anonymes n'y passent pas : ce sont les gardes de chaque route qui les
+ * traitent.
  */
 function lectureSeule(req, _res, next) {
   const role = req.utilisateur?.role;
   if (!role || !LECTURE_SEULE.has(role)) return next();
   if (METHODES_LECTURE.has(req.method)) return next();
+
+  // `originalUrl` porte le chemin complet : les routeurs sont montés sur « / »
+  // et `req.path` serait amputé du préfixe selon le point de montage.
+  const chemin = (req.originalUrl || req.url).split('?')[0];
+  const permises = ECRITURES_AUTORISEES[role] ?? [];
+  if (permises.some((e) => e.methode === req.method && e.chemin.test(chemin))) {
+    return next();
+  }
 
   return next(erreurs.accesRefuse(
     'Ce profil est en consultation seule. Les opérations de recensement, '

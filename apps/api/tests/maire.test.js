@@ -101,9 +101,35 @@ test('le refus dit pourquoi, sans accuser', async () => {
   assert.match(JSON.parse(r.texte).erreur.message, /consultation seule/i);
 });
 
-test('le maire n\'accède pas au registre des dérogations', async () => {
-  // Il relève de la municipalité ; les décisions dérogatoires relèvent de
-  // l'exploitant, sous double vérification.
+test('le maire consulte le registre des dérogations', async () => {
+  // Il en est la seconde signature : il doit voir ce qu'on lui demande de
+  // valider.
   const r = await appel('/derogations');
-  assert.equal(r.statut, 403, `attendu 403, obtenu ${r.statut}`);
+  assert.equal(r.statut, 200, r.texte);
+});
+
+test('le maire peut changer son mot de passe', async () => {
+  // Tous les comptes y sont contraints à la première connexion. Une règle de
+  // consultation qui bloque cette écriture-là enferme le maire dehors : il ne
+  // peut plus se servir de son compte du tout.
+  //
+  // On n'envoie pas un changement réel — cela invaliderait le compte de
+  // démonstration. Un mot de passe actuel faux doit être refusé pour CE
+  // motif, pas pour cause de lecture seule.
+  const r = await appel('/auth/mot-de-passe', {
+    methode: 'POST',
+    corps: { mot_de_passe_actuel: 'FauxMotDePasse1', nouveau_mot_de_passe: 'AutreMotDePasse2' },
+  });
+  assert.notEqual(r.statut, 403,
+    `la route est fermée au maire par la règle de consultation : ${r.texte.slice(0, 160)}`);
+});
+
+test('valider une dérogation reste ouvert au maire', async () => {
+  // La seule écriture par laquelle il engage la commune. Sur un identifiant
+  // inexistant, la réponse doit être « introuvable » — pas « consultation
+  // seule », qui signifierait que la porte est fermée.
+  const r = await appel('/derogations/00000000-0000-0000-0000-000000000000/validation',
+    { methode: 'POST' });
+  assert.notEqual(r.statut, 403,
+    `la validation est fermée au maire : ${r.texte.slice(0, 160)}`);
 });

@@ -76,6 +76,22 @@ test('le chef de projet accède au registre des dérogations', async () => {
   assert.equal(r.statut, 200, r.texte);
 });
 
+test('le chef de projet saisit, mais ne valide pas', async () => {
+  // La double vérification traverse les deux organisations : l'exploitant
+  // instruit, la municipalité conclut. Laisser le chef de projet valider sa
+  // propre saisie — ou celle d'un collègue — rendrait à l'exploitant un droit
+  // sur les échéances que la constitution lui refuse (principe III).
+  const jeton = await connecter(CHEF_PROJET);
+  const r = await appel('/derogations/00000000-0000-0000-0000-000000000000/validation',
+    { methode: 'POST', jeton });
+  assert.equal(r.statut, 403,
+    `le chef de projet ne doit pas valider : ${r.statut} — ${r.texte.slice(0, 160)}`);
+
+  const e = await appel('/exonerations/00000000-0000-0000-0000-000000000000/validation',
+    { methode: 'POST', jeton });
+  assert.equal(e.statut, 403, `exonération : ${e.statut} — ${e.texte.slice(0, 160)}`);
+});
+
 test('l\'administrateur de la commune n\'y accède pas', async () => {
   // Il détient le barème, pas les dérogations. Réunir les deux permettrait de
   // fixer une dette puis de la remettre.

@@ -29,7 +29,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { api } from '@/lib/api';
+import { api, profilCourant } from '@/lib/api';
 import { xof, pourcentage, date as formaterDate } from '@/lib/format';
 import {
   Carte, Bouton, Tableau, Chargement, Message, EtatVide, BadgeStatut,
@@ -41,6 +41,7 @@ const NATURES = {
 };
 
 export default function PageDerogations() {
+  const [profil, setProfil] = useState(null);
   const [donnees, setDonnees] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [filtre, setFiltre] = useState('en_attente');
@@ -55,7 +56,12 @@ export default function PageDerogations() {
     } catch (err) { setErreur(err.message); }
   }, [filtre]);
 
+  useEffect(() => { setProfil(profilCourant()); }, []);
   useEffect(() => { charger(); }, [charger]);
+
+  // Le maire valide, le chef de projet saisit. Montrer à ce dernier un bouton
+  // que le serveur refusera lui ferait croire à une panne.
+  const peutValider = profil?.role === 'maire';
 
   async function valider(decision) {
     setEnCours(decision.id);
@@ -159,10 +165,10 @@ export default function PageDerogations() {
               {
                 cle: 'action',
                 titre: '',
-                rendu: (l) => (l.opposable ? null : (
+                rendu: (l) => (l.opposable || !peutValider ? null : (
                   <Bouton taille="petit"
                     onClick={() => valider(l)}
-                    disabled={enCours === l.id}>
+                    desactive={enCours === l.id}>
                     {enCours === l.id ? '…' : 'Valider'}
                   </Bouton>
                 )),
@@ -170,9 +176,14 @@ export default function PageDerogations() {
             ]} />
         )}
         <p className="mt-3 text-[13px] text-encre-attenuee">
-          Vous ne pouvez pas valider une décision que vous avez saisie : il faut
-          un second chef de projet. Ce n&apos;est pas de la défiance — c&apos;est ce qui
-          protège celui qui saisit autant que la commune.
+          {peutValider
+            ? 'Valider engage la commune : la remise devient opposable et réduit '
+              + 'le montant dû. Tant que vous ne validez pas, la décision reste '
+              + 'sans effet sur les montants.'
+            : 'Vous instruisez et saisissez ; la validation revient à la '
+              + 'municipalité. Remettre une dette publique est un acte de la '
+              + 'commune — ce partage protège celui qui saisit autant que la '
+              + 'commune elle-même.'}
         </p>
       </Carte>
     </div>
