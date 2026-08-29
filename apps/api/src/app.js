@@ -133,6 +133,13 @@ app.use(express.urlencoded({ extended: false, limit: '256kb' }));
 // ---------------------------------------------------------------------------
 app.use('/public', require('./routes/public.routes'));
 
+// Canal USSD — public lui aussi. Le numéro appelant vaut identification
+// lorsqu'il correspond à un numéro vérifié ; sinon la réponse est
+// indistinguable de celle servie à un numéro inconnu (FR-067, FR-068).
+// C'est le canal de référence du principe VI : il fonctionne sur un
+// téléphone sans Internet, ce qui décrit la majorité des redevables.
+app.use('/ussd', require('./routes/ussd.routes'));
+
 // Portail du redevable — public lui aussi, mais protégé par sa propre session
 // (code à usage unique + cookie httpOnly). Monté ici, avant limiteApi, parce
 // qu'un commerçant qui consulte son dossier n'a pas de JWT d'agent.
