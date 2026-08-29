@@ -221,8 +221,19 @@ verifier "Sans jeton, l'API refuse" "$?" "(reçu $code)"
 
 # Le rôle applicatif ne doit voir aucune ligne sans contexte de commune :
 # c'est la garantie d'isolation multi-communes.
-sansContexte=$(docker exec -e PGPASSWORD="${DB_PASSWORD}" "$PG_CONTENEUR" \
-  psql -tAX -U "${DB_USER}" -d "${DB_NAME}" -c "SELECT count(*) FROM app.commerce" 2>/dev/null | tr -d ' ')
+# Cette requête passe volontairement par le rôle APPLICATIF, et non par
+# l'administrateur : c'est lui que les politiques d'isolation doivent aveugler.
+# D'où un second accès, distinct de psql_admin.
+psql_app() {
+  if docker inspect -f '{{.State.Running}}' "$PG_CONTENEUR" 2>/dev/null | grep -q true; then
+    psql_app psql -tAX -U "${DB_USER}" -d "${DB_NAME}" "$@"
+  else
+    PGPASSWORD="${DB_PASSWORD}" psql -tAX -h "${DB_HOST:-127.0.0.1}" \
+      -U "${DB_USER}" -d "${DB_NAME}" "$@"
+  fi
+}
+
+sansContexte=$(psql_app -c "SELECT count(*) FROM app.commerce" 2>/dev/null | tr -d ' ')
 [[ "${sansContexte:-1}" == "0" ]]
 verifier "Isolation : 0 ligne visible sans contexte de commune" "$?" "(vu $sansContexte)"
 
@@ -372,7 +383,12 @@ else
   alerter "Aucune période fiscale" "POST /periodes puis /generer et /emettre"
 fi
 
-quittanceId=$(appel "$API/quittances?limite=1" | lire ".donnees[0].id")
+# Une quittance dont le paiement a été CONTRE-PASSÉ ne peut pas être émise, et
+# l'API a raison de la refuser. Tirer la première venue faisait échouer la
+# recette sur un comportement correct : on écarte donc les paiements annulés.
+quittanceId=$(psql_admin -c "SELECT q.id FROM app.quittance q
+    JOIN app.paiement p ON p.id = q.paiement_id
+   WHERE p.annule_le IS NULL ORDER BY q.cree_le DESC LIMIT 1" | tr -d ' ')
 if [[ -n "$quittanceId" ]]; then
   codeHttp=$(curl -s -o /dev/null -w '%{http_code}' -m 30 "${H[@]}" "$API/quittances/$quittanceId/pdf")
   [[ "$codeHttp" == "200" || "$codeHttp" == "302" ]]
@@ -404,8 +420,18 @@ section "10. Accès public"
 # loup finit par ne plus être lue — et c'est le jour où elle a raison qu'on
 # l'ignore. On l'annonce donc, et on éprouve ce qui est éprouvable : la page
 # publique elle-même, servie par le tableau de bord local.
-if [[ "$ENV_FICHIER" == ".env.demo" ]]; then
-  echo "  ${GRIS}HTTPS non testé : ni Nginx ni certificat en local${NC}"
+# La condition porte sur ce qui est VRAI — l'absence de proxy inverse — et non
+# sur le nom du fichier d'environnement. Un poste de développement pointant sur
+# « localhost » ou sur un domaine encore à renseigner produisait trois échecs
+# rouges alors qu'aucune fonction n'était cassée.
+sans_proxy=0
+case "${APP_DOMAIN:-}" in
+  ''|localhost|*A_REMPLIR*|*.local) sans_proxy=1 ;;
+esac
+[[ "$ENV_FICHIER" == ".env.demo" ]] && sans_proxy=1
+
+if [[ "$sans_proxy" == "1" ]]; then
+  echo "  ${GRIS}HTTPS non testé : ni Nginx ni certificat devant cette instance${NC}"
   BASE_PUBLIQUE="$DASH"
 else
   for hote in "api.${APP_DOMAIN}/healthz" "gtfc.${APP_DOMAIN}/connexion"; do
