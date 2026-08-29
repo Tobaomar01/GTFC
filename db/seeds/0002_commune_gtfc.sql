@@ -95,7 +95,7 @@ INSERT INTO app.commune_parametre (
     50,
     true, true,
     25,
-    true,
+    false,   -- encaissement en espèces interdit depuis 0041 (FR-030)
     true
 )
 ON CONFLICT (commune_id) DO NOTHING;
