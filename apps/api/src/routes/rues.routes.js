@@ -55,6 +55,7 @@ router.get('/', valider(pagination.extend({
   zone_id: uuid.optional(),
   couverture: z.enum(['non_commencee', 'en_cours', 'terminee']).optional(),
   sans_trace: z.enum(['oui']).optional(),
+  a_valider: z.enum(['oui']).optional(),
 }), 'query'), asyncHandler(async (req, res) => {
   const { limite, decalage, page } = lirePagination(req.query, { defaut: 100, max: 500 });
   const filtres = ['r.archive_le IS NULL', 'r.actif'];
@@ -71,6 +72,8 @@ router.get('/', valider(pagination.extend({
     filtres.push(`r.statut_couverture = $${params.length}::app.statut_couverture`);
   }
   if (req.query.sans_trace === 'oui') filtres.push('r.geom IS NULL');
+  // La liste de relecture de la mairie.
+  if (req.query.a_valider === 'oui') filtres.push('r.a_remplacer AND r.valide_le IS NULL');
   if (req.query.q) {
     params.push(`%${req.query.q}%`);
     // La recherche porte aussi sur les variantes : l'agent tape le nom qu'il
@@ -86,6 +89,8 @@ router.get('/', valider(pagination.extend({
     SELECT r.id, r.code, r.nom, r.type_voie, r.source, r.variantes,
            r.statut_couverture, r.nb_objets_recenses, r.longueur_m,
            (r.geom IS NOT NULL) AS tracee,
+           (r.a_remplacer AND r.valide_le IS NULL) AS a_valider,
+           r.valide_le,
            q.nom AS quartier, z.nom AS zone,
            count(*) OVER () AS total_general
       FROM app.rue r
@@ -238,8 +243,13 @@ router.post('/import', exigerRole('admin_commune'), valider(z.object({
 
       const { rows } = await client.query(`
         INSERT INTO app.rue (commune_id, code, nom, quartier_id, zone_id, type_voie,
-                             source, variantes, geom, longueur_m, cree_par)
+                             source, variantes, a_remplacer, geom, longueur_m, cree_par)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,
+                -- Une voie importée n'engage pas la commune tant qu'elle ne
+                -- l'a pas relue. Le taux de collecte par rue se lira sur ces
+                -- noms : bâti sur une source externe non validée, il sera
+                -- contesté le jour où il désignera un quartier.
+                true,
                 CASE WHEN $9::text IS NULL THEN NULL
                      ELSE ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($9), 4326)) END,
                 CASE WHEN $9::text IS NULL THEN NULL
@@ -253,6 +263,10 @@ router.post('/import', exigerRole('admin_commune'), valider(z.object({
             variantes  = ARRAY(SELECT DISTINCT unnest(app.rue.variantes || EXCLUDED.variantes)),
             quartier_id = coalesce(app.rue.quartier_id, EXCLUDED.quartier_id),
             zone_id     = coalesce(app.rue.zone_id, EXCLUDED.zone_id),
+            -- Un réimport ne renvoie pas en relecture ce que la mairie a déjà
+            -- arrêté : sans cette ligne, chaque rafraîchissement de la source
+            -- effacerait son travail.
+            a_remplacer = app.rue.a_remplacer,
             modifie_le = now()
         RETURNING (xmax = 0) AS insere, (geom IS NOT NULL) AS tracee`,
       [req.utilisateur.communeId, r.code, r.nom, r.quartier_id ?? null, r.zone_id ?? null,
@@ -318,6 +332,42 @@ router.post('/:id/couverture', exigerRole('agent'), valider(paramsId, 'params'),
        WHERE id = $1 AND archive_le IS NULL
        RETURNING id, code, nom, statut_couverture, nb_objets_recenses, couverture_terminee_le`,
     [req.params.id, req.body.statut, req.utilisateur.id]);
+
+    if (!rows[0]) throw erreurs.introuvable('Rue');
+    return ok(res, rows[0]);
+  }));
+
+// ---------------------------------------------------------------------------
+// POST /rues/:id/valider — la mairie arrête le libellé
+// ---------------------------------------------------------------------------
+/**
+ * Une voie importée porte le nom que lui donne sa source — OpenStreetMap pour
+ * l'essentiel, une source bénévole, précieuse et faillible. Tant que personne
+ * à la mairie ne l'a relue, elle figure à l'inventaire des données
+ * provisoires et le tableau de bord le signale.
+ *
+ * Valider, c'est engager la commune sur ce nom. On trace donc qui l'a fait et
+ * quand : le jour où un taux de collecte par rue sera contesté, la question
+ * posée sera « qui a arrêté ce libellé ».
+ *
+ * Le nom peut être corrigé au passage — c'est le cas courant : la plaque dit
+ * autre chose que la carte.
+ */
+router.post('/:id/valider', exigerRole('admin_commune'),
+  valider(paramsId, 'params'),
+  valider(z.object({ nom: texteCourt(150).optional() }), 'body'),
+  asyncHandler(async (req, res) => {
+    const { rows } = await requete(req.contexte, `
+      UPDATE app.rue
+         SET nom = coalesce($2, nom),
+             a_remplacer = false,
+             valide_le = now(),
+             valide_par = $3,
+             modifie_le = now(),
+             modifie_par = $3
+       WHERE id = $1 AND archive_le IS NULL
+       RETURNING id, code, nom, source, valide_le`,
+    [req.params.id, req.body.nom ?? null, req.utilisateur.id]);
 
     if (!rows[0]) throw erreurs.introuvable('Rue');
     return ok(res, rows[0]);

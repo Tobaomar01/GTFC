@@ -31,21 +31,28 @@ tableau de bord affiche un bandeau discret, l'application agent le dit
 
 ## Produire les tuiles
 
-### Depuis OpenStreetMap — gratuit, immédiat
-
 ```bash
-# 1. Extrait de la région, puis découpe sur la commune
-wget https://download.geofabrik.de/africa/senegal-latest.osm.pbf
-osmium extract -b -17.47,14.67,-17.42,14.71 senegal-latest.osm.pbf -o gtfc.osm.pbf
-
-# 2. Rendu en tuiles vectorielles puis raster (tilemaker, ou un rendu mapnik)
-tilemaker --input gtfc.osm.pbf --output tuiles.mbtiles
-
-# 3. Découpe en fichiers servis directement par Nginx
-mb-util --image_format=png tuiles.mbtiles /var/www/tuiles
+bash infra/tuiles/generer.sh
 ```
 
-Zoom 14 à 19. Pour 2 km², compter quelques centaines de mégaoctets.
+Le script fait tout : extrait régional, découpe sur l'emprise de la commune,
+rendu, découpe en fichiers. Il vérifie d'abord que les outils sont là et
+refuse de commencer sinon — un échec à mi-parcours laisserait 800 Mo d'extrait
+et pas une tuile.
+
+Il bascule le nouveau jeu en une fois et conserve l'ancien : personne ne voit
+un arbre à moitié écrit, et le retour en arrière tient en un `mv`.
+
+Prérequis, sur Ubuntu :
+
+```bash
+sudo apt-get install -y curl osmium-tool tilemaker
+pip3 install mbutil
+```
+
+Zoom 14 à 19 par défaut. Pour 2 km², compter quelques centaines de mégaoctets.
+L'emprise et les zooms se règlent par variables d'environnement — voir
+l'en-tête du script.
 
 ### Depuis une orthophoto — précision de 2 à 5 cm
 

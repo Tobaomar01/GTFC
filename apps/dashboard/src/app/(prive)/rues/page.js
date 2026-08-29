@@ -224,6 +224,16 @@ node db/importer-rues-osm.js --importer`}
                   <p className="text-[12px] text-encre-attenuee">
                     {[r.quartier, r.zone].filter(Boolean).join(' · ') || 'quartier non rattaché'}
                     {r.tracee ? '' : ' · sans tracé'}
+                    {/* Le nom vient d'une source externe et n'engage pas
+                        encore la commune. Le taux de collecte de cette voie
+                        se lira dessus : le dire ici évite qu'on le découvre
+                        le jour où le chiffre est contesté. */}
+                    {r.a_valider
+                      ? <span style={{ color: 'var(--st-partiel)' }}>
+                        {' · '}
+                        {r.source === 'osm' ? 'nom OpenStreetMap, à valider' : 'nom à valider'}
+                      </span>
+                      : null}
                   </p>
                 </div>
               ),
