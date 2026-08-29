@@ -75,10 +75,56 @@ if [ "$echoues" -gt 0 ]; then
 fi
 
 echo "==> Contenu"
-psql -q "$BASE" -At -c "
-    SELECT '   commerces  : ' || count(*) FROM app.commerce
-    UNION ALL SELECT '   redevables : ' || count(*) FROM app.redevable
-    UNION ALL SELECT '   agents     : ' || count(*) FROM app.utilisateur"
+#
+# Une table vide qui devrait être pleine ne se signale pas toute seule : le
+# seed se termine sans erreur et l'installation paraît réussie. C'est ce qui
+# est arrivé aux chantiers, restés à zéro pendant des semaines parce que leur
+# seed tournait avant celui des rues.
+#
+# Cette liste est l'inventaire de ce qu'une installation utilisable doit
+# contenir. À compléter quand une nouvelle famille d'objets apparaît.
+#
+ATTENDUES="
+app.commune
+app.zone
+app.quartier
+app.rue
+app.utilisateur
+app.commerce
+app.redevable
+app.dispositif_affichage
+app.chantier
+app.commerce_taxe
+ref.categorie_commerce
+ref.categorie_taxe
+ref.type_taxe
+ref.type_affichage
+ref.motif_contestation
+ref.motif_exoneration
+"
+
+vides=0
+for table in $ATTENDUES; do
+    n=$(psql -q "$BASE" -At -c "SELECT count(*) FROM $table" 2>/dev/null || echo "erreur")
+    if [ "$n" = "erreur" ]; then
+        echo "   $table : TABLE ABSENTE"
+        vides=$((vides + 1))
+    elif [ "$n" = "0" ]; then
+        echo "   $table : VIDE"
+        vides=$((vides + 1))
+    else
+        printf '   %-28s %s\n' "$table" "$n"
+    fi
+done
+
+if [ "$vides" -gt 0 ]; then
+    echo
+    echo "$vides table(s) vide(s) ou absente(s) : l'installation n'est pas utilisable."
+    echo "Un seed qui ne trouve rien à faire se termine sans erreur — c'est"
+    echo "précisément ce que ce contrôle rattrape."
+    echo "La base $BASE est conservée pour examen."
+    exit 1
+fi
 
 echo "==> Jeu de tests sur cette base neuve"
 # Les tests lisent avec un compte privilégié pour voir au-delà des politiques

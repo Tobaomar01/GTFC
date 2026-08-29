@@ -1,9 +1,14 @@
--- Seed 0008 — Dispositifs d'affichage et chantiers de démonstration
+-- Seed 0008 — Dispositifs d'affichage de démonstration
 --
 -- Le jeu de démonstration n'en contenait aucun. Conséquence : la taxe sur les
--- enseignes et la TODP de chantier n'étaient jamais exercées — ni par les
--- tests, ni par une démonstration à la mairie. Deux chemins de facturation
--- entiers restaient dans l'angle mort.
+-- enseignes n'était jamais exercée — ni par les tests, ni par une
+-- démonstration à la mairie. Un chemin de facturation entier restait dans
+-- l'angle mort.
+--
+-- Les chantiers, qui figuraient ici, sont passés au seed 0012 : ils
+-- s'accrochent à une rue, et les rues ne sont créées qu'au seed 0009. Placés
+-- avant elles, ils n'en trouvaient aucune et le seed en créait ZÉRO sans rien
+-- signaler.
 --
 -- Les dimensions retenues sont plausibles pour une devanture de quartier :
 -- une enseigne de boutique fait rarement plus de 2 m², un panneau
@@ -68,45 +73,6 @@ BEGIN
         END LOOP;
         RAISE NOTICE 'Dispositifs d''affichage créés : %', v_n;
     END IF;
-
-    -- Chantiers : recensés, redevables de la TODP, mais NON facturables
-    -- durant le pilote (FR-021d). C'est justement ce qu'il faut pouvoir
-    -- démontrer : ils apparaissent au registre et sur la carte sans qu'aucun
-    -- avis ne parte.
-    IF EXISTS (SELECT 1 FROM app.chantier WHERE commune_id = v_commune) THEN
-        RAISE NOTICE 'Chantiers déjà présents — rien à faire.';
-    ELSE
-        v_n := 0;
-        SELECT coalesce(max(numero_sequence), 0) INTO v_seq
-          FROM app.chantier WHERE commune_id = v_commune;
-
-        FOR v_c IN
-            SELECT r.id AS redevable_id, ru.id AS rue_id, ru.quartier_id,
-                   q.zone_id, row_number() OVER (ORDER BY ru.code) AS rang
-              FROM app.rue ru
-              JOIN app.quartier q ON q.id = ru.quartier_id
-              CROSS JOIN LATERAL (
-                  SELECT id FROM app.redevable
-                   WHERE commune_id = v_commune AND archive_le IS NULL LIMIT 1) r
-             WHERE ru.commune_id = v_commune
-             ORDER BY ru.code LIMIT 5
-        LOOP
-            v_seq := v_seq + 1;
-            INSERT INTO app.chantier
-                (commune_id, redevable_id, code, numero_sequence, libelle,
-                 rue_id, quartier_id, zone_id, surface_m2,
-                 date_constat, duree_prevue_jours, autorisation_vue,
-                 statut, facturable)
-            VALUES (v_commune, v_c.redevable_id,
-                    'GTFC-C-' || lpad(v_seq::text, 5, '0'), v_seq,
-                    'DEMO — chantier ' || v_c.rang,
-                    v_c.rue_id, v_c.quartier_id, v_c.zone_id,
-                    8.0 + v_c.rang * 4,
-                    current_date - 30, 90, v_c.rang % 2 = 0,
-                    'en_cours', false);
-            v_n := v_n + 1;
-        END LOOP;
-        RAISE NOTICE 'Chantiers créés : % (tous non facturables)', v_n;
-    END IF;
 END
 $$;
+

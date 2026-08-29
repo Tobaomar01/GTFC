@@ -193,6 +193,15 @@ test('le solde est toujours la différence du dû et du versé', async () => {
 });
 
 test('un chantier non facturable ne produit aucune ligne', async () => {
+  // Sans cette première vérification le test serait vrai par vacuité : aucun
+  // chantier, donc aucune ligne, donc « conforme ». C'est exactement ce qui
+  // s'est passé pendant des semaines — le seed des chantiers tournait avant
+  // celui des rues et n'en créait aucun, en silence.
+  const chantiers = await un(
+    'SELECT count(*)::int AS n FROM app.chantier WHERE NOT facturable');
+  assert.ok(chantiers.n > 0,
+    'aucun chantier non facturable en base : le test ne vérifierait rien');
+
   const r = await un(`
     SELECT count(*)::int AS n
       FROM app.avis_ligne l

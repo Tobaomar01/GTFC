@@ -65,6 +65,27 @@ async function refuse(texte, valeurs = []) {
   catch { return true; }
 }
 
+/**
+ * Exécute des écritures puis les ANNULE, toujours.
+ *
+ * Pour éprouver un invariant sur des données qui n'existent pas — une
+ * exonération non validée, par exemple. Sans cela le test serait vrai par
+ * vacuité : zéro ligne, donc zéro ligne fautive, donc « conforme ».
+ *
+ * Le `ROLLBACK` est dans un `finally` : même une assertion qui échoue au
+ * milieu ne laisse rien derrière elle.
+ */
+async function enTransaction(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    return await fn(client);
+  } finally {
+    await client.query('ROLLBACK').catch(() => {});
+    client.release();
+  }
+}
+
 async function fermer() { await pool.end(); }
 
-module.exports = { pool, q, un, refuse, fermer, URL };
+module.exports = { pool, q, un, refuse, enTransaction, fermer, URL };

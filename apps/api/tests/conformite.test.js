@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { q, un, refuse, fermer } = require('./aide');
+const { q, un, refuse, enTransaction, fermer } = require('./aide');
 
 test.after(fermer);
 
@@ -59,9 +59,36 @@ test('Constitution III — une exonération ne peut être validée par son auteu
 });
 
 test('Constitution III — seules les exonérations validées sont opposables', async () => {
-  const r = await un(
-    'SELECT count(*)::int AS n FROM app.v_exoneration_opposable WHERE valide_par IS NULL');
-  assert.equal(r.n, 0);
+  // Éprouvé sur une exonération RÉELLE, non validée, créée puis annulée.
+  // Se contenter de compter les lignes fautives d'une table vide donnerait
+  // « conforme » sans rien avoir vérifié.
+  await enTransaction(async (client) => {
+    const { rows: [ctx] } = await client.query(`
+      SELECT c.id AS commerce_id, c.commune_id,
+             (SELECT id FROM ref.motif_exoneration LIMIT 1) AS motif_id,
+             (SELECT id FROM app.utilisateur WHERE role = 'chef_projet' LIMIT 1) AS chef
+        FROM app.commerce c WHERE c.archive_le IS NULL LIMIT 1`);
+    assert.ok(ctx?.commerce_id && ctx.motif_id && ctx.chef,
+      'il faut un commerce, un motif et un chef de projet pour éprouver la règle');
+
+    const { rows: [exo] } = await client.query(`
+      INSERT INTO app.exoneration
+        (commune_id, commerce_id, motif_id, taux_pct, date_debut,
+         justification, accorde_par)
+      VALUES ($1, $2, $3, 100, current_date, 'éprouve la règle', $4)
+      RETURNING id`,
+    [ctx.commune_id, ctx.commerce_id, ctx.motif_id, ctx.chef]);
+
+    const { rows: opposables } = await client.query(
+      'SELECT id FROM app.v_exoneration_opposable WHERE id = $1', [exo.id]);
+    assert.equal(opposables.length, 0,
+      'une exonération non validée réduirait un montant dû');
+
+    const { rows: registre } = await client.query(
+      'SELECT id FROM app.exoneration WHERE id = $1', [exo.id]);
+    assert.equal(registre.length, 1,
+      'elle doit exister au registre : c\'est une décision en attente, pas un rejet');
+  });
 });
 
 test('Constitution III — le registre dérogatoire exige deux personnes', async () => {
