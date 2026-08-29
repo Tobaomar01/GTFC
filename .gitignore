@@ -87,3 +87,4 @@ desktop.ini
 
 # Export de validation Metro
 apps/mobile/.export-test/
+apps/mobile/dist-verif/

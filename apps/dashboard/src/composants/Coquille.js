@@ -21,6 +21,11 @@ const PAGES = [
   { href: '/audit', libelle: "Journal d'audit", icone: '⎗', role: 'superviseur' },
   { href: '/parametres', libelle: 'Paramètres', icone: '⚙', role: 'admin_commune' },
   { href: '/communes', libelle: 'Communes', icone: '⌂', role: 'super_admin' },
+  // Rôle EXACT, non hiérarchique. Un chef de projet n'est pas « un
+  // administrateur en plus fort » : il détient les décisions dérogatoires
+  // que personne d'autre n'a. Les ranger sur une échelle donnerait ce
+  // pouvoir à l'administrateur (Constitution III).
+  { href: '/derogations', libelle: 'Dérogations', icone: '⚑', roleExact: 'chef_projet' },
 ];
 
 export default function Coquille({ children }) {
@@ -47,7 +52,10 @@ export default function Coquille({ children }) {
     }
   };
 
-  const pages = PAGES.filter((p) => auMoins(profil?.role ?? 'agent', p.role));
+  // Un rôle exact ne se compare pas à un niveau : il correspond, ou pas.
+  const pages = PAGES.filter((p) => (p.roleExact
+    ? profil?.role === p.roleExact
+    : auMoins(profil?.role ?? 'agent', p.role)));
 
   return (
     <div className="flex min-h-screen">
