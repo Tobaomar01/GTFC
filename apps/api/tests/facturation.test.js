@@ -37,18 +37,26 @@ test('creer_periode_annuelle est idempotente', async () => {
 test('un avis annuel vaut le mensuel multiplié par les mois couverts', async () => {
   // Le défaut trouvé : le montant était divisé par douze au lieu d'être
   // multiplié, sous-facturant d'un facteur douze.
+  //
+  // La comparaison se fait LIGNE À LIGNE, sur les seules taxes présentes des
+  // deux côtés : les deux avis peuvent avoir été générés à des moments où le
+  // rattachement des taxes différait, et comparer les totaux ferait alors
+  // échouer un calcul pourtant juste.
   const lignes = await q(`
-    SELECT m.montant_total AS mensuel, a.montant_total AS annuel, a.mois_couverts
+    SELECT lm.montant AS mensuel, la.montant AS annuel, a.mois_couverts, t.code AS taxe
       FROM app.avis_imposition m
       JOIN app.periode_fiscale pm ON pm.id = m.periode_id AND pm.periodicite = 'mensuelle'
+      JOIN app.avis_ligne lm      ON lm.avis_id = m.id
       JOIN app.avis_imposition a  ON a.commerce_id = m.commerce_id
       JOIN app.periode_fiscale pa ON pa.id = a.periode_id AND pa.periodicite = 'annuelle'
-     WHERE m.montant_total > 0 AND a.montant_total > 0
-     LIMIT 10`);
-  assert.ok(lignes.length > 0, 'il faut des avis des deux périodicités pour comparer');
+      JOIN app.avis_ligne la      ON la.avis_id = a.id AND la.type_taxe_id = lm.type_taxe_id
+      JOIN ref.type_taxe t        ON t.id = lm.type_taxe_id
+     WHERE lm.montant > 0
+     LIMIT 20`);
+  assert.ok(lignes.length > 0, 'il faut des lignes comparables des deux périodicités');
   for (const l of lignes) {
     assert.equal(Number(l.annuel), Number(l.mensuel) * Number(l.mois_couverts),
-      `annuel ${l.annuel} devrait valoir ${l.mensuel} × ${l.mois_couverts}`);
+      `${l.taxe} : annuel ${l.annuel} devrait valoir ${l.mensuel} × ${l.mois_couverts}`);
   }
 });
 
