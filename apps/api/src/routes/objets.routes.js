@@ -176,7 +176,10 @@ router.post('/affichages/:id/deposer', exigerRole('agent'), valider(paramsId, 'p
   asyncHandler(async (req, res) => {
     const { rows } = await requete(req.contexte, `
       UPDATE app.dispositif_affichage
-         SET date_depose = $2, actif = false, notes = concat_ws(E'\\n', notes, $3),
+         -- Le paramètre est transtypé : « concat_ws » accepte n'importe quel
+         -- type, donc PostgreSQL ne déduit rien du contexte et refuse la
+         -- requête. Le dépôt d'un dispositif échouait à chaque appel.
+         SET date_depose = $2, actif = false, notes = concat_ws(E'\\n', notes, $3::text),
              modifie_le = now(), modifie_par = $4, version = version + 1
        WHERE id = $1 AND archive_le IS NULL
        RETURNING id, code, date_depose, actif`,
@@ -380,7 +383,7 @@ router.post('/chantiers/:id/constat', exigerRole('agent'), valider(paramsId, 'pa
              date_fin_constatee = coalesce($3::date, date_fin_constatee),
              date_fin_prevue    = coalesce($4::date, date_fin_prevue),
              surface_m2         = coalesce($5::numeric, surface_m2),
-             notes              = concat_ws(E'\\n', notes, $6),
+             notes              = concat_ws(E'\\n', notes, $6::text),
              derniere_visite_le = now(),
              modifie_le = now(), modifie_par = $7, version = version + 1
        WHERE id = $1 AND archive_le IS NULL

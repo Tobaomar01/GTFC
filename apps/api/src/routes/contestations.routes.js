@@ -191,7 +191,11 @@ router.post('/contestations/:id/instruire', exigerRole('superviseur'), valider(p
       UPDATE app.contestation
          SET statut = $2::app.statut_contestation,
              instruite_par = $3, instruite_le = coalesce(instruite_le, now()),
-             notes_instruction = concat_ws(E'\\n', notes_instruction, $4),
+             -- $4 transtypé explicitement : « concat_ws » accepte n'importe quel
+             -- type, donc PostgreSQL ne peut RIEN déduire du contexte et refuse
+             -- la requête. L'instruction échouait à CHAQUE appel — l'étape du
+             -- milieu de la procédure en trois temps n'a jamais fonctionné.
+             notes_instruction = concat_ws(E'\\n', notes_instruction, $4::text),
              suspend_recouvrement = coalesce($5::boolean, suspend_recouvrement),
              suspendu_par = CASE WHEN $5::boolean THEN $3 ELSE suspendu_par END,
              modifie_le = now()
