@@ -30,22 +30,58 @@ let enCours = new Set();
  * déclenchement suivant.
  */
 function tache(nom, fn) {
-  return async () => {
+  const enveloppee = async (origine = 'planificateur') => {
     if (enCours.has(nom)) {
       logger.warn({ tache: nom }, 'Exécution précédente encore en cours — passage ignoré');
-      return;
+      return { ignore: true };
     }
     enCours.add(nom);
     const debut = Date.now();
+
+    // Chaque exécution est consignée EN BASE, pas seulement dans le journal du
+    // serveur. Une tâche qui échoue à trois heures du matin ne laissait qu'une
+    // ligne dans un fichier que personne ne lit : elle pouvait échouer toutes
+    // les nuits pendant des mois sans que rien ne le dise.
+    let ligne = null;
+    try {
+      const { rows } = await db.requete(CONTEXTE,
+        'INSERT INTO app.tache_planifiee (tache, origine) VALUES ($1, $2) RETURNING id',
+        [nom, origine]);
+      ligne = rows[0]?.id ?? null;
+    } catch (err) {
+      // Journaliser ne doit jamais empêcher la tâche de tourner.
+      logger.warn({ tache: nom, err: err.message }, 'Journal des tâches indisponible');
+    }
+
+    const consigner = async (succes, resultat, erreur) => {
+      if (!ligne) return;
+      await db.requete(CONTEXTE, `
+        UPDATE app.tache_planifiee
+           SET termine_le = now(), duree_ms = $2, succes = $3,
+               resultat = $4::jsonb, erreur = $5
+         WHERE id = $1`,
+      [ligne, Date.now() - debut, succes,
+        resultat ? JSON.stringify(resultat) : null, erreur ?? null])
+        .catch((e) => logger.warn({ err: e.message }, 'Consignation impossible'));
+    };
+
     try {
       const resultat = await fn();
       logger.info({ tache: nom, duree_ms: Date.now() - debut, resultat }, 'Tâche terminée');
+      await consigner(true, resultat, null);
+      return { succes: true, resultat };
     } catch (err) {
       logger.error({ tache: nom, err, duree_ms: Date.now() - debut }, 'Tâche en échec');
+      await consigner(false, null, String(err?.message ?? err).slice(0, 2000));
+      return { succes: false, erreur: String(err?.message ?? err) };
     } finally {
       enCours.delete(nom);
     }
   };
+  // Le nom voyage avec la fonction : sans lui, on ne peut pas désigner une
+  // tâche depuis la ligne de commande.
+  enveloppee.nomTache = nom;
+  return enveloppee;
 }
 
 // ---------------------------------------------------------------------------
@@ -57,11 +93,20 @@ function tache(nom, fn) {
 // la marge.
 // ---------------------------------------------------------------------------
 const creerPartitions = tache('partitions', async () => {
-  const { rows: positions } = await db.requete(CONTEXTE,
-    'SELECT app.creer_partitions_position(0, 4) AS nb');
+  // Cette tâche appelait d'abord `app.creer_partitions_position`, supprimée
+  // avec le suivi de position des agents (migration 0042). L'appel est resté.
+  //
+  // Elle échouait donc AVANT d'arriver à la ligne suivante — celle qui compte.
+  // Le journal d'audit est partitionné par mois et n'a pas de partition par
+  // défaut : le mois où la dernière s'épuise, plus aucune écriture auditée ne
+  // passe. Comme l'audit se déclenche sur toute écriture sensible, c'est le
+  // système entier qui s'arrête, un premier du mois, sans prévenir.
+  //
+  // La seule trace aurait été une ligne de journal, à une heure du matin, le
+  // 25 du mois précédent.
   const { rows: audit } = await db.requete(CONTEXTE,
     'SELECT audit.creer_partitions_journal(0, 4) AS nb');
-  return { partitions_positions: positions[0].nb, partitions_audit: audit[0].nb };
+  return { partitions_audit: audit[0].nb };
 });
 
 // ---------------------------------------------------------------------------
@@ -185,7 +230,21 @@ const controlerCoherence = tache('coherence', async () => {
         'Contrôle de cohérence en erreur');
     }
   }
-  return { alertes: alertes.length, detail: alertes };
+  // La marge du journal d'audit n'est propre à aucune commune : c'est une
+  // échéance d'infrastructure. Quand elle tombe à zéro, plus aucune écriture
+  // sensible n'est possible — le système entier s'arrête, d'un coup, un
+  // premier du mois. On la regarde tous les jours pour la voir venir de loin.
+  const { rows: [marge] } = await db.requete(CONTEXTE, 'SELECT * FROM audit.marge_partitions()');
+  if (marge?.alerte) {
+    alertes.push({ commune: '—', controle: 'partitions_audit', detail: marge.alerte });
+    logger.error({ marge }, marge.alerte);
+  }
+
+  return {
+    alertes: alertes.length,
+    detail: alertes,
+    partitions_audit_mois_restants: marge?.mois_restants ?? null,
+  };
 });
 
 // ---------------------------------------------------------------------------
@@ -389,7 +448,61 @@ process.on('SIGTERM', () => arreter('SIGTERM'));
 process.on('SIGINT', () => arreter('SIGINT'));
 process.on('unhandledRejection', (raison) => logger.error({ raison }, 'Promesse rejetée'));
 
-demarrer().catch((err) => {
-  logger.fatal({ err }, 'Échec du démarrage du planificateur');
-  process.exit(1);
-});
+/**
+ * Exécution à la demande, sans lancer le planificateur.
+ *
+ *     node src/scheduler.js --une-fois            toutes les tâches, une fois
+ *     node src/scheduler.js --une-fois penalites  une seule
+ *     node src/scheduler.js --lister              les noms disponibles
+ *
+ * Douze tâches tournent sans personne, à une heure du matin. Elles n'avaient
+ * aucun moyen d'être déclenchées à la main : ni pour les éprouver, ni pour
+ * rattraper une nuit manquée après une coupure. Attendre le prochain passage
+ * était la seule option — jusqu'à un mois pour la facturation.
+ */
+async function uneFois(filtre) {
+  const choisies = taches
+    .map(([, fn, libelle]) => ({ nom: fn.nomTache, fn, libelle }))
+    .filter((t) => !filtre || t.nom === filtre || t.libelle.toLowerCase().includes(filtre));
+
+  if (choisies.length === 0) {
+    console.error(`Aucune tâche ne correspond à « ${filtre} ».`);
+    console.error(`Disponibles : ${taches.map(([, f]) => f.nomTache).join(', ')}`);
+    process.exit(1);
+  }
+
+  let echecs = 0;
+  for (const t of choisies) {
+    process.stdout.write(`  ${t.libelle} … `);
+    const bilan = await t.fn('manuel');
+    if (bilan?.succes === false) {
+      echecs += 1;
+      console.log(`ÉCHEC — ${bilan.erreur}`);
+    } else {
+      console.log(`ok ${bilan?.resultat ? JSON.stringify(bilan.resultat) : ''}`);
+    }
+  }
+
+  await db.fermer();
+  console.log(`\n  ${choisies.length - echecs} réussie(s), ${echecs} en échec`);
+  process.exit(echecs > 0 ? 1 : 0);
+}
+
+const argument = process.argv[2];
+if (argument === '--lister') {
+  for (const [cron, fn, libelle] of taches) {
+    console.log(`  ${fn.nomTache.padEnd(22)} ${cron.padEnd(14)} ${libelle}`);
+  }
+  process.exit(0);
+}
+if (argument === '--une-fois') {
+  uneFois(process.argv[3] ?? null).catch((err) => {
+    console.error(`Échec : ${err.message}`);
+    process.exit(1);
+  });
+} else {
+  demarrer().catch((err) => {
+    logger.fatal({ err }, 'Échec du démarrage du planificateur');
+    process.exit(1);
+  });
+}
