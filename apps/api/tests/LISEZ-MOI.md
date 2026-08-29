@@ -47,6 +47,12 @@ Les faire échouer doit demander une décision, pas un correctif distrait.
 | `facturation.test.js` | Liquidation annuelle, prorata, solde — les quatre défauts ci-dessus |
 | `ussd.test.js` | Confidentialité du canal USSD et contraintes d'encodage |
 | `parcours-terrain.test.js` | La chaîne complète, par l'API réelle : du lot synchronisé au QR et à l'avis |
+| `paiement-wave.test.js` | Signature du webhook et idempotence de l'encaissement |
+| `code-usage-unique.test.js` | Durée, tentatives et plafond du code du portail |
+| `rues.test.js` | Référentiel des voies et validation par la mairie |
+| `derogations.test.js` | Qui saisit, qui valide, qui ne peut ni l'un ni l'autre |
+| `maire.test.js` | Le profil de consultation et ses seules écritures |
+| `audit-concurrent.test.js` | La chaîne d'audit sous écritures simultanées |
 
 Le test le plus important est celui du **silence USSD** : une réponse qui
 différerait entre un numéro inconnu et un numéro non vérifié permettrait
@@ -103,3 +109,17 @@ cette famille-là que ce contrôle rattrape.
 
 La sortie doit rester **vide**. Un avertissement connu qu'on laisse traîner
 enterre celui qui viendra ensuite.
+
+## Les chemins que la constitution exige d'éprouver
+
+Elle en nomme six, « les seuls chemins où un défaut coûte de l'argent réel ou
+de la confiance ». Voici où ils sont couverts.
+
+| Chemin | Couvert par |
+|---|---|
+| Idempotence des paiements | `paiement-wave.test.js` |
+| Imputation des versements | `paiement-wave.test.js`, `facturation.test.js` |
+| Rapprochement avec l'opérateur | `paiement-wave.test.js` (signature, montant plafonné) |
+| Synchronisation hors ligne et conflits | `parcours-terrain.test.js` |
+| Limites du code à usage unique | `code-usage-unique.test.js` |
+| Chaînage du journal d'audit | `audit-concurrent.test.js`, `conformite.test.js` |
