@@ -17,7 +17,7 @@ Trois applications et une base :
 | | |
 |---|---|
 | `apps/api` | Express, PostgreSQL 17 + PostGIS. 94 tests. |
-| `apps/dashboard` | Next.js. 12 pages. **Aucun test.** |
+| `apps/dashboard` | Next.js. 12 pages, 13 tests de navigateur. |
 | `apps/mobile` | Expo / React Native. Compile ; jamais installée sur un téléphone. |
 | `db/` | 59 migrations, 13 seeds. Installation depuis une base vide vérifiée. |
 
@@ -112,6 +112,11 @@ géolocalisés, et qui valide une remise de dette.
 # 1. L'installation depuis une base vide, puis les 94 tests
 bash scripts/verifier-installation-neuve.sh gtfc_epreuve
 
+# 1 bis. La recette fonctionnelle et les pages du tableau de bord
+#        (exigent l'API sur 4000 et le tableau de bord sur 3000)
+DB_NAME=gtfc_recette RECETTE_MDP='GtfcDemo2026!' bash scripts/recette.sh
+cd apps/dashboard && npm test
+
 # 2. Le tableau de bord compile
 cd apps/dashboard && npx next build
 
@@ -143,12 +148,15 @@ avertissement laissé traîner enterre celui qui viendra ensuite.
 - Rôles et séparation des pouvoirs : le chef de projet instruit une remise de
   dette, le maire la valide. Aucun des deux ne peut la conclure seul.
 
+- Tableau de bord : les douze pages s'ouvrent dans un vrai navigateur et
+  portent leurs données. Deux d'entre elles ne fonctionnaient pas.
+- Recette fonctionnelle : 31 contrôles au vert, sur un poste sans serveur.
+
 ### Ce qui reste à coder
 
-**Le tableau de bord n'a aucun test.** Douze pages. Le seul défaut qu'on y a
-trouvé — une variable retirée dont l'usage était resté — mettait une page
-entière hors service, et ni la compilation ni les tests ne pouvaient le voir.
-C'est la plus grande surface non éprouvée du projet. Compter une demi-journée.
+Rien de bloquant. Les surfaces principales sont éprouvées. Ce qui manque
+encore de tests : les sept écrans mobiles au-delà des fonctions pures, les
+contestations de bout en bout, et le portail redevable côté navigateur.
 
 ### Ce qui est bloqué ailleurs
 
@@ -198,3 +206,14 @@ rattachent à aucune rue.
 
 Une demi-journée de terrain sur une seule rue, avec un vrai téléphone,
 apprendra plus que n'importe quel test écrit d'ici.
+
+---
+
+## Éprouver l'application sur un téléphone, dès maintenant
+
+Le recensement ne dépend ni des tarifs, ni de Wave, ni de l'USSD : il se teste
+avant que le serveur n'existe, contre l'API du poste, par le Wi-Fi.
+
+Voir `apps/mobile/TESTER-SANS-SERVEUR.md`. Deux voies : Expo Go en cinq
+minutes sans rien installer, ou un APK autonome qui demande un compte Expo
+gratuit.
