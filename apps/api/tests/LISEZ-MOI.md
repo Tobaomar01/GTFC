@@ -46,6 +46,7 @@ Les faire échouer doit demander une décision, pas un correctif distrait.
 | `conformite.test.js` | Les six principes de la constitution et les décisions du commanditaire |
 | `facturation.test.js` | Liquidation annuelle, prorata, solde — les quatre défauts ci-dessus |
 | `ussd.test.js` | Confidentialité du canal USSD et contraintes d'encodage |
+| `parcours-terrain.test.js` | La chaîne complète, par l'API réelle : du lot synchronisé au QR et à l'avis |
 
 Le test le plus important est celui du **silence USSD** : une réponse qui
 différerait entre un numéro inconnu et un numéro non vérifié permettrait

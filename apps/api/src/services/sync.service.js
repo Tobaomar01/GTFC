@@ -428,6 +428,16 @@ async function traiterLot(contexte, lot) {
     ]));
 
     resultats.push({
+      // On part du résultat du gestionnaire. La liste blanche qui suit ne fait
+      // que garantir l'enveloppe : tout champ supplémentaire produit par un
+      // gestionnaire doit atteindre le téléphone.
+      //
+      // Elle était auparavant exhaustive, et laissait tomber en silence ce
+      // qu'elle ne connaissait pas. C'est ainsi que le jeton QR généré à la
+      // synchronisation n'arrivait jamais sur l'appareil, alors que
+      // `commerces.repo.confirmerCreation` l'attend pour poser le sticker :
+      // tous les commerces recensés hors ligne restaient sans QR imprimable.
+      ...resultat,
       ordre: op.ordre,
       identifiant_local: op.identifiant_local,
       entite: op.entite,
