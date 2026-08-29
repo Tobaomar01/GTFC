@@ -83,11 +83,22 @@ async function resoudreTerritoire(client, { communeId, longitude, latitude, quar
  */
 async function attacherTaxes(client, { communeId, commerceId, categorieId, mesures, agentId,
   taxesForcees = null }) {
+  // Seules les taxes CONDITIONNELLES sont traitées ici. Les inconditionnelles
+  // sont posées par un déclencheur à l'insertion du commerce (migration 0051),
+  // qui les attache à TOUT commerce, y compris ceux dont la catégorie ne les
+  // mentionne pas — un oubli de patente ne se voit pas, il se lit seulement
+  // dans un total plus faible que prévu.
+  //
+  // Les insérer une seconde fois ici était sans effet : la contrainte
+  // d'exclusion les rejetait et `ON CONFLICT DO NOTHING` avalait le rejet. La
+  // date de début calculée ci-dessous était donc silencieusement perdue au
+  // profit de celle du déclencheur. Mieux vaut ne pas prétendre les écrire.
   const { rows: types } = await client.query(
     `SELECT tt.id, tt.code, tt.conditionnelle, ct.obligatoire
        FROM ref.categorie_taxe ct
        JOIN ref.type_taxe tt ON tt.id = ct.type_taxe_id
       WHERE ct.categorie_id = $1
+        AND tt.conditionnelle
       ORDER BY tt.ordre_affichage`,
     [categorieId],
   );

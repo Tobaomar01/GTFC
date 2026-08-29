@@ -13,7 +13,40 @@ test.after(fermer);
  * facteur douze. Ces tests existent pour qu'aucun ne revienne.
  */
 
+/**
+ * Garantit qu'il existe une période annuelle ET ses avis.
+ *
+ * Ces tests lisaient auparavant les avis qui se trouvaient là. Sur la base de
+ * recette il y en avait, hérités des essais précédents ; sur une installation
+ * NEUVE il n'y en a aucun, et deux tests échouaient sans rien signaler de
+ * réel. Un test qui ne vaut que sur une base déjà façonnée ne protège de rien
+ * le jour d'un déploiement.
+ *
+ * La génération est idempotente : relancée, elle ne facture pas deux fois.
+ */
+async function assurerPeriodeAnnuelle() {
+  const commune = await un("SELECT id FROM app.commune WHERE code = 'GTFC'");
+  const { id } = await un('SELECT app.creer_periode_annuelle($1, $2) AS id',
+    [commune.id, new Date().getFullYear()]);
+  return id;
+}
+
+async function preparerAvis() {
+  const id = await assurerPeriodeAnnuelle();
+
+  const existants = await un(
+    `SELECT count(*)::int AS n FROM app.avis_imposition
+      WHERE periode_id = $1 AND annule_le IS NULL`, [id]);
+  if (existants.n === 0) await q('SELECT * FROM app.generer_avis_periode($1)', [id]);
+
+  return id;
+}
+
 async function periodeAnnuelle() {
+  // Sur une installation neuve aucune période n'existe encore : on la crée
+  // plutôt que d'affirmer qu'elle devrait être là. C'est précisément la
+  // fonction de création qu'on éprouve ensuite.
+  await assurerPeriodeAnnuelle();
   return un(`SELECT id, to_char(date_debut, 'MM-DD') AS debut,
                     to_char(date_fin,   'MM-DD') AS fin
                FROM app.periode_fiscale
@@ -34,29 +67,58 @@ test('creer_periode_annuelle est idempotente', async () => {
   assert.equal(a.id, b.id, 'relancer ne doit pas créer une seconde période');
 });
 
-test('un avis annuel vaut le mensuel multiplié par les mois couverts', async () => {
-  // Le défaut trouvé : le montant était divisé par douze au lieu d'être
+test('la ligne annuelle est un multiple entier du tarif mensuel', async () => {
+  // Le défaut trouvé : le montant était DIVISÉ par douze au lieu d'être
   // multiplié, sous-facturant d'un facteur douze.
   //
-  // La comparaison se fait LIGNE À LIGNE, sur les seules taxes présentes des
-  // deux côtés : les deux avis peuvent avoir été générés à des moments où le
-  // rattachement des taxes différait, et comparer les totaux ferait alors
-  // échouer un calcul pourtant juste.
+  // La comparaison se faisait autrefois avec un avis MENSUEL. Depuis la
+  // liquidation annuelle (migration 0046) le système ne crée plus de période
+  // mensuelle : le test ne tenait que par les données héritées de la base de
+  // recette, et n'aurait rien vérifié sur un serveur neuf.
+  //
+  // On ne refait pas non plus le calcul du générateur — un test qui redit
+  // l'implémentation ne prouve rien. On vérifie ce qui doit être vrai quelle
+  // que soit la façon de compter les mois : une ligne annuelle portant une
+  // taxe mensuelle vaut un NOMBRE ENTIER de mensualités, entre une et douze.
+  // La division par douze produisait une fraction de mensualité : elle échoue
+  // ici sur les trois conditions à la fois.
+  const periodeId = await preparerAvis();
+
   const lignes = await q(`
-    SELECT lm.montant AS mensuel, la.montant AS annuel, a.mois_couverts, t.code AS taxe
-      FROM app.avis_imposition m
-      JOIN app.periode_fiscale pm ON pm.id = m.periode_id AND pm.periodicite = 'mensuelle'
-      JOIN app.avis_ligne lm      ON lm.avis_id = m.id
-      JOIN app.avis_imposition a  ON a.commerce_id = m.commerce_id
-      JOIN app.periode_fiscale pa ON pa.id = a.periode_id AND pa.periodicite = 'annuelle'
-      JOIN app.avis_ligne la      ON la.avis_id = a.id AND la.type_taxe_id = lm.type_taxe_id
-      JOIN ref.type_taxe t        ON t.id = lm.type_taxe_id
-     WHERE lm.montant > 0
-     LIMIT 20`);
-  assert.ok(lignes.length > 0, 'il faut des lignes comparables des deux périodicités');
+    SELECT t.code AS taxe, l.montant AS annuel, c.montant AS mensuel
+      FROM app.avis_imposition av
+      JOIN app.avis_ligne l      ON l.avis_id = av.id
+      JOIN app.periode_fiscale p ON p.id = av.periode_id
+      JOIN ref.type_taxe t       ON t.id = l.type_taxe_id
+      JOIN app.commerce_taxe ct  ON ct.commerce_id = l.objet_id
+                                AND ct.type_taxe_id = l.type_taxe_id AND ct.actif
+      -- Le tarif est relevé à la date où la taxe commence, comme le fait le
+      -- générateur : avant elle, aucun barème ne s'applique.
+      CROSS JOIN LATERAL app.calculer_taxe(
+        l.objet_id, l.type_taxe_id,
+        greatest(p.date_debut, ct.date_debut)) c
+     WHERE av.periode_id = $1
+       AND av.annule_le IS NULL
+       AND p.periodicite = 'annuelle'
+       AND l.objet_type = 'commerce'
+       AND l.taux_exoneration_pct = 0
+       AND l.montant > 0
+       AND c.montant > 0
+       AND t.periodicite_defaut = 'mensuelle'
+     LIMIT 30`, [periodeId]);
+
+  assert.ok(lignes.length > 0,
+    'la période annuelle doit porter des lignes de taxe mensuelle');
+
   for (const l of lignes) {
-    assert.equal(Number(l.annuel), Number(l.mensuel) * Number(l.mois_couverts),
-      `${l.taxe} : annuel ${l.annuel} devrait valoir ${l.mensuel} × ${l.mois_couverts}`);
+    const rapport = Number(l.annuel) / Number(l.mensuel);
+    assert.ok(rapport >= 1,
+      `${l.taxe} : ${l.annuel} est INFÉRIEUR à une mensualité de ${l.mensuel}`);
+    assert.ok(rapport <= 12,
+      `${l.taxe} : ${l.annuel} dépasse douze mensualités de ${l.mensuel}`);
+    assert.ok(Math.abs(rapport - Math.round(rapport)) < 0.01,
+      `${l.taxe} : ${l.annuel} ne fait pas un nombre entier de mensualités `
+      + `de ${l.mensuel} (rapport ${rapport.toFixed(3)})`);
   }
 });
 
@@ -113,6 +175,7 @@ test('un avis soldé ne conseille aucun versement', async () => {
 });
 
 test('le surpaiement est refusé par la base', async () => {
+  await preparerAvis();
   const avis = await un(`
     SELECT id, montant_total FROM app.avis_imposition
      WHERE montant_total > 0 AND annule_le IS NULL LIMIT 1`);

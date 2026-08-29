@@ -51,3 +51,35 @@ Les faire échouer doit demander une décision, pas un correctif distrait.
 Le test le plus important est celui du **silence USSD** : une réponse qui
 différerait entre un numéro inconnu et un numéro non vérifié permettrait
 d'énumérer les redevables de la commune en composant au hasard.
+
+## Sur quelle base
+
+L'API ne lit **pas** `DATABASE_URL` : elle compose sa connexion à partir de
+`DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. Les tests, eux, lisent
+`DATABASE_URL_TEST`. Poser l'un sans l'autre dirige les tests vers une base et
+l'application vers une autre — la panne qui s'ensuit ressemble à une violation
+de clé étrangère, et non à ce qu'elle est. `aide.js` refuse désormais de
+démarrer dans ce cas.
+
+Les deux connexions sont volontairement distinctes : les tests lisent avec un
+compte privilégié pour voir au-delà des politiques d'isolation, l'application
+se connecte comme en production.
+
+```bash
+cd apps/api
+DATABASE_URL_TEST=postgres://localhost/gtfc_recette \
+DB_NAME=gtfc_recette \
+node --test $(find tests -name '*.test.js')
+```
+
+## Avant un déploiement
+
+```bash
+bash scripts/verifier-installation-neuve.sh
+```
+
+Rejoue une installation depuis une base vide — extensions, rôles, toutes les
+migrations, tous les seeds — puis le jeu de tests complet. C'est le seul moyen
+de voir ce qu'une base de travail cache : elle porte des états qu'un serveur
+neuf n'aura jamais. La première exécution a trouvé un seed qui entrait en
+collision avec un déclencheur ajouté après lui.

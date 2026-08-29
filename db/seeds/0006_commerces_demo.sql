@@ -121,7 +121,22 @@ FOR i IN 1..60 LOOP
     v_nb_crees := v_nb_crees + 1;
 
     -- -----------------------------------------------------------------------
-    -- 2. Taxes dues par ce commerce
+    -- 2. Taxes CONDITIONNELLES dues par ce commerce
+    --
+    --    Les taxes inconditionnelles — la patente en tête — ne sont PAS
+    --    reprises ici : depuis la migration 0051, un déclencheur les rattache
+    --    à l'insertion du commerce, parce qu'un oubli de patente ne se voit
+    --    pas, il se lit seulement dans un total plus faible que prévu.
+    --
+    --    Les insérer une seconde fois violait la contrainte d'exclusion
+    --    « commerce_taxe_pas_de_doublon » et faisait échouer ce seed sur toute
+    --    installation NEUVE. Sur la base de recette le défaut restait invisible :
+    --    les seeds y avaient été joués AVANT que le déclencheur n'existe.
+    --
+    --    Une taxe, un endroit qui la rattache. Le déclencheur pour les
+    --    inconditionnelles, ce bloc pour les conditionnelles, que seul le
+    --    terrain peut constater et mesurer.
+    --
     --    date_debut au 1er du mois : sans cela, la génération des avis de la
     --    période courante ne trouverait aucune taxe active à sa date de début.
     -- -----------------------------------------------------------------------
@@ -141,6 +156,8 @@ FOR i IN 1..60 LOOP
     FROM ref.categorie_taxe ct
     JOIN ref.type_taxe tt ON tt.id = ct.type_taxe_id
     WHERE ct.categorie_id = v_cat.id
+      -- Les inconditionnelles sont déjà posées par le déclencheur (0051)
+      AND tt.conditionnelle
       -- On n'attache TODP et enseignes que si l'agent a effectivement mesuré
       AND (tt.code <> 'todp'     OR v_todp     IS NOT NULL)
       AND (tt.code <> 'enseigne' OR v_enseigne IS NOT NULL)
