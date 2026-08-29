@@ -348,7 +348,10 @@ router.get('/exonerations',
   }));
 
 router.post('/exonerations',
-  exigerRole('admin_commune'),
+  // FR-020j : ni l'agent, ni le superviseur, ni l'administrateur. Le chef de
+  // projet accorde ; un SECOND chef de projet valide. Tant que la validation
+  // manque, l'exonération ne réduit aucun montant (FR-020i).
+  exigerRole(['chef_projet']),
   valider(z.object({
     commerce_id: uuid,
     motif_id: uuid,
@@ -373,7 +376,7 @@ router.post('/exonerations',
   }));
 
 router.post('/exonerations/:id/revoquer',
-  exigerRole('admin_commune'),
+  exigerRole(['chef_projet']),
   valider(paramsId, 'params'),
   valider(z.object({ motif: texteCourt(500) })),
   asyncHandler(async (req, res) => {

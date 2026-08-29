@@ -17,6 +17,19 @@ const ROLES = ['agent', 'superviseur', 'admin_commune', 'super_admin'];
 /** Hiérarchie : un rôle donne accès à ce que peuvent les rôles au-dessous. */
 const NIVEAU = { agent: 1, superviseur: 2, admin_commune: 3, super_admin: 4 };
 
+/**
+ * Rôles délibérément HORS de la hiérarchie.
+ *
+ * Un chef de projet n'est pas « un administrateur en plus fort » : il détient
+ * les décisions dérogatoires — montant forcé, exonération — que personne
+ * d'autre n'a, et n'a pas la main sur le barème, que l'administrateur
+ * détient. Les ranger sur une échelle serait faux, et c'est ainsi qu'un
+ * super-administrateur finit par tout pouvoir (Constitution III).
+ *
+ * Ils s'exigent donc par liste exacte, jamais par niveau.
+ */
+const HORS_HIERARCHIE = new Set(['chef_projet']);
+
 function signerJetonAcces(utilisateur) {
   return jwt.sign(
     {
@@ -93,6 +106,21 @@ function authentifierSiPossible(req, res, next) {
 function exigerRole(rolesAutorises) {
   const liste = Array.isArray(rolesAutorises) ? rolesAutorises : [rolesAutorises];
   const parNiveau = !Array.isArray(rolesAutorises);
+
+  // Échec au démarrage plutôt qu'un refus silencieux à la première requête :
+  // un rôle hors hiérarchie exigé par niveau donnerait NIVEAU[x] === undefined,
+  // donc une comparaison toujours fausse, sans que rien ne le signale.
+  if (parNiveau) {
+    if (HORS_HIERARCHIE.has(liste[0])) {
+      throw new Error(
+        `Le rôle « ${liste[0]} » est hors hiérarchie : l'exiger par niveau `
+        + `refuserait tout le monde. Utiliser exigerRole(['${liste[0]}']).`);
+    }
+    if (NIVEAU[liste[0]] === undefined) {
+      throw new Error(`Rôle inconnu dans la hiérarchie : ${liste[0]}`);
+    }
+  }
+
   const niveauMinimum = parNiveau ? NIVEAU[liste[0]] : null;
 
   return (req, _res, next) => {
@@ -116,6 +144,13 @@ function exigerRole(rolesAutorises) {
  * pas une opération de mairie.
  */
 const exigerSuperAdmin = exigerRole(['super_admin']);
+
+/**
+ * Décisions dérogatoires : montant forcé et exonération, les deux façons
+ * d'effacer une dette (FR-020e, FR-020j). Liste exacte : ni l'administrateur
+ * ni le super-administrateur n'en héritent.
+ */
+const exigerChefProjet = exigerRole(['chef_projet']);
 
 /**
  * Vérifie qu'un utilisateur rattaché à une commune en a bien une.
@@ -150,4 +185,5 @@ module.exports = {
   exigerRole,
   exigerSuperAdmin,
   exigerCommune,
+  exigerChefProjet,
 };

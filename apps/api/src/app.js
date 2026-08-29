@@ -168,6 +168,10 @@ app.use('/redevables', require('./routes/redevables.routes'));
 app.use('/rues', require('./routes/rues.routes'));
 app.use('/', require('./routes/objets.routes'));        // /affichages, /chantiers
 app.use('/', require('./routes/contestations.routes')); // /contestations, /motifs-contestation
+// Décisions dérogatoires — montants forcés et exonérations, les deux
+// façons d'effacer une dette. Réservées au chef de projet, sous double
+// vérification (Constitution III).
+app.use('/', require('./routes/derogations.routes')); // /derogations, /exonerations/:id/validation
 
 // ---------------------------------------------------------------------------
 // Racine : inventaire des routes, utile au développeur
