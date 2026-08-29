@@ -40,12 +40,13 @@ router.post('/periodes',
   exigerRole('admin_commune'),
   valider(z.object({
     annee: z.coerce.number().int().min(2024).max(2100),
-    mois: z.coerce.number().int().min(1).max(12),
   })),
   asyncHandler(async (req, res) => {
+    // La période est annuelle depuis 0046 : la taxe est liquidée une fois
+    // par an et le redevable résorbe le solde à son rythme (FR-021).
     const { rows } = await requete(req.contexte,
-      'SELECT app.creer_periode_mensuelle($1, $2, $3) AS id',
-      [req.utilisateur.communeId, req.body.annee, req.body.mois]);
+      'SELECT app.creer_periode_annuelle($1, $2) AS id',
+      [req.utilisateur.communeId, req.body.annee]);
 
     const { rows: periode } = await requete(req.contexte,
       'SELECT id, code, date_debut, date_fin, date_exigibilite FROM app.periode_fiscale WHERE id = $1',

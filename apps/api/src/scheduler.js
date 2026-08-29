@@ -66,22 +66,25 @@ const creerPartitions = tache('partitions', async () => {
 
 // ---------------------------------------------------------------------------
 // 2. Périodes fiscales — 25 de chaque mois, 01h30
-// La période du mois suivant est créée à l'avance pour chaque commune active.
+//
+// La période est ANNUELLE depuis 0046. La tâche crée celle de l'année en
+// cours si elle manque, et celle de l'année suivante dès décembre : une
+// liquidation ne doit jamais buter sur une période absente au 1er janvier.
 // ---------------------------------------------------------------------------
 const preparerPeriodes = tache('periodes', async () => {
   const { rows: communes } = await db.requete(CONTEXTE,
     'SELECT id, code FROM app.commune WHERE actif AND archive_le IS NULL');
 
-  const suivant = new Date();
-  suivant.setMonth(suivant.getMonth() + 1);
-  const annee = suivant.getFullYear();
-  const mois = suivant.getMonth() + 1;
+  const maintenant = new Date();
+  const annees = [maintenant.getFullYear()];
+  if (maintenant.getMonth() === 11) annees.push(maintenant.getFullYear() + 1);
 
   const creees = [];
   for (const c of communes) {
-    await db.requete(CONTEXTE, 'SELECT app.creer_periode_mensuelle($1, $2, $3)',
-      [c.id, annee, mois]);
-    creees.push(`${c.code} ${annee}-${String(mois).padStart(2, '0')}`);
+    for (const annee of annees) {
+      await db.requete(CONTEXTE, 'SELECT app.creer_periode_annuelle($1, $2)', [c.id, annee]);
+      creees.push(`${c.code} ${annee}`);
+    }
   }
   return { periodes: creees };
 });
@@ -164,16 +167,20 @@ const controlerCoherence = tache('coherence', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// 8. Facturation mensuelle — le 1er du mois, 03h30
+// 8. Liquidation annuelle — le 1er du mois, 03h30
 //
-// La séquence complète : période, avis, émission, liens de paiement,
-// notifications. C'est le cœur du dispositif : chaque mois, les 5 443
-// commerces reçoivent leur avis groupant toutes leurs taxes.
+// La taxe est liquidée UNE FOIS PAR AN (FR-021). La somme constitue un solde
+// que le redevable résorbe à son rythme : en une fois, par mensualités, ou
+// par versements de son choix. Il peut payer en avance.
 //
-// Chaque étape est idempotente : si le serveur tombe au milieu, relancer la
-// tâche reprend là où elle en était sans rien facturer deux fois.
+// La tâche tourne néanmoins tous les mois, et c'est voulu : elle est
+// idempotente, et un commerce recensé en cours d'année doit être liquidé
+// sans attendre janvier prochain.
+//
+// La notification mensuelle, elle, reste mensuelle : elle rappelle le solde
+// et porte le lien Wave, sans créer d'échéance opposable.
 // ---------------------------------------------------------------------------
-const facturerLeMois = tache('facturation_mensuelle', async () => {
+const facturerLeMois = tache('liquidation_annuelle', async () => {
   const { rows: communes } = await db.requete(CONTEXTE,
     'SELECT id, code FROM app.commune WHERE actif AND archive_le IS NULL');
 
@@ -184,8 +191,8 @@ const facturerLeMois = tache('facturation_mensuelle', async () => {
     const contexte = { superAdmin: true, communeId: c.id };
     try {
       const periodeId = (await db.requete(contexte,
-        'SELECT app.creer_periode_mensuelle($1, $2, $3) AS id',
-        [c.id, maintenant.getFullYear(), maintenant.getMonth() + 1])).rows[0].id;
+        'SELECT app.creer_periode_annuelle($1, $2) AS id',
+        [c.id, maintenant.getFullYear()])).rows[0].id;
 
       const generation = (await db.requete(contexte,
         'SELECT * FROM app.generer_avis_periode($1, NULL)', [periodeId])).rows[0];
