@@ -44,6 +44,9 @@ DECLARE
     -- payer les mois antérieurs à son rattachement (FR-009b).
     v_debut_du  date;
     v_mois_dus  integer;
+    -- Nombre de mois que l'avis couvre réellement. Sert au prorata : compter
+    -- depuis janvier signalerait en retard un commerce recensé en août.
+    v_mois_couverts integer;
     v_taxe_ens  uuid;
 BEGIN
     SELECT * INTO v_periode FROM app.periode_fiscale WHERE id = p_periode_id;
@@ -84,6 +87,7 @@ BEGIN
         BEGIN
             v_total := 0;
             v_ordre := 0;
+            v_mois_couverts := 0;
             v_seq   := v_seq + 1;
             v_numero := format('%s-%s-%s',
                                coalesce(v_param.prefixe_code_commerce, 'AVIS'),
@@ -168,6 +172,8 @@ BEGIN
                         END IF;
                     END IF;
 
+                    v_mois_couverts := greatest(v_mois_couverts, v_mois_dus);
+
                     CONTINUE WHEN v_calc.montant IS NULL;
 
                     v_exo := app.exoneration_applicable(v_commerce.id, v_taxe.type_taxe_id,
@@ -240,6 +246,7 @@ BEGIN
             UPDATE app.avis_imposition
                SET montant_taxes = v_total,
                    montant_total = v_total + v_report,
+                   mois_couverts = nullif(v_mois_couverts, 0),
                    statut = (CASE WHEN v_total + v_report = 0 THEN 'paye'
                                   ELSE 'brouillon' END)::app.statut_avis
              WHERE id = v_avis_id;
