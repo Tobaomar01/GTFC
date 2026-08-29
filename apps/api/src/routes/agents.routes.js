@@ -21,7 +21,7 @@ router.use(authentifier, exigerCommune);
 // ---------------------------------------------------------------------------
 router.get('/',
   valider(pagination.extend({
-    role: z.enum(['agent', 'superviseur', 'admin_commune']).optional(),
+    role: z.enum(['agent', 'superviseur', 'admin_commune', 'chef_projet']).optional(),
     actif: z.coerce.boolean().optional(),
     zone_id: uuid.optional(),
   }), 'query'),
@@ -85,7 +85,7 @@ router.post('/',
     telephone,
     email: z.string().email().optional(),
     matricule: z.string().max(40).optional(),
-    role: z.enum(['agent', 'superviseur', 'admin_commune']),
+    role: z.enum(['agent', 'superviseur', 'admin_commune', 'chef_projet']),
     date_embauche: z.coerce.date().optional(),
     zones: z.array(uuid).optional(),
     mot_de_passe_provisoire: z.string().min(10).max(200),
@@ -98,6 +98,18 @@ router.post('/',
     if (b.role === 'admin_commune' && req.utilisateur.role !== 'super_admin'
         && req.utilisateur.role !== 'admin_commune') {
       throw erreurs.accesRefuse('Seul un administrateur peut créer un administrateur');
+    }
+
+    // Le chef de projet est NOMMÉ, pas promu. Il détient les décisions
+    // dérogatoires — montant forcé, exonération — que l'administrateur n'a
+    // pas, et l'administrateur détient le barème que le chef de projet n'a
+    // pas. Laisser l'administrateur ouvrir ce compte lui permettrait de
+    // réunir les deux mains en s'en attribuant un (Constitution III).
+    if (b.role === 'chef_projet' && req.utilisateur.role !== 'super_admin') {
+      throw erreurs.accesRefuse(
+        'Seul le super-administrateur nomme un chef de projet : ce rôle détient '
+        + 'les dérogations, que l\'administrateur de la commune ne peut pas '
+        + 's\'attribuer lui-même.');
     }
 
     const hash = await auth.hacherMotDePasse(b.mot_de_passe_provisoire);
@@ -137,13 +149,21 @@ router.patch('/:id',
     prenom: texteCourt(120).optional(),
     email: z.string().email().nullable().optional(),
     matricule: z.string().max(40).nullable().optional(),
-    role: z.enum(['agent', 'superviseur', 'admin_commune']).optional(),
+    role: z.enum(['agent', 'superviseur', 'admin_commune', 'chef_projet']).optional(),
     actif: z.boolean().optional(),
     date_fin: z.coerce.date().nullable().optional(),
   })),
   asyncHandler(async (req, res) => {
     const champs = Object.keys(req.body);
     if (champs.length === 0) throw erreurs.requeteInvalide('Aucun champ à modifier');
+
+    // Même règle qu'à la création : le chef de projet est nommé par le
+    // super-administrateur. Sans cette garde, l'administrateur contournait la
+    // précédente en promouvant un compte existant — le sien, par exemple.
+    if (req.body.role === 'chef_projet' && req.utilisateur.role !== 'super_admin') {
+      throw erreurs.accesRefuse(
+        'Seul le super-administrateur nomme un chef de projet.');
+    }
 
     const valeurs = [req.params.id, req.utilisateur.id];
     const sets = champs.map((c) => {

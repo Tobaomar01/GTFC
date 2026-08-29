@@ -29,7 +29,10 @@ const SUPER = { superAdmin: true };
 const lire = (sql, params = []) => avecContexte(SUPER, (client) => client.query(sql, params));
 const auth = require('../src/services/auth.service');
 
-const ROLES = ['agent', 'superviseur', 'admin_commune', 'super_admin'];
+// `chef_projet` détient les décisions dérogatoires — montant forcé,
+// exonération — que personne d'autre n'a. Sans lui dans cette liste, le
+// registre des dérogations restait inaccessible sur toute installation neuve.
+const ROLES = ['agent', 'superviseur', 'admin_commune', 'super_admin', 'chef_projet'];
 
 function lireArguments() {
   const args = {};
@@ -96,7 +99,8 @@ async function principal() {
     console.log(`
 Création d'un compte — plateforme GTFC
 
-  --role <role>        agent | superviseur | admin_commune | super_admin  (obligatoire)
+  --role <role>        agent | superviseur | admin_commune | chef_projet |
+                       super_admin                                (obligatoire)
   --nom <nom>          Nom de famille                                     (obligatoire)
   --prenom <prenom>    Prénom                                             (obligatoire)
   --telephone <num>    Identifiant de connexion, ex. +221771234567        (obligatoire)
@@ -108,7 +112,8 @@ Création d'un compte — plateforme GTFC
     process.exit(0);
   }
 
-  const role = args.role || await demander('Rôle (agent/superviseur/admin_commune/super_admin) : ');
+  const role = args.role
+    || await demander('Rôle (agent/superviseur/admin_commune/chef_projet/super_admin) : ');
   if (!ROLES.includes(role)) {
     console.error(`\n  ✗ Rôle invalide : ${role}\n    Valeurs acceptées : ${ROLES.join(', ')}\n`);
     process.exit(1);

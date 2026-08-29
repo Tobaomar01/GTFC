@@ -100,8 +100,22 @@ export const ROLES = {
   superviseur: 'Superviseur',
   admin_commune: 'Administrateur de la commune',
   super_admin: 'Super-administrateur',
+  // Hors hiérarchie : il détient les dérogations, pas le barème. Il est
+  // volontairement absent de NIVEAU ci-dessous — le ranger sur l'échelle
+  // donnerait ses pouvoirs au super-administrateur (Constitution III).
+  chef_projet: 'Chef de projet',
+  maire: 'Maire',
 };
 
+/** Profils qui consultent sans jamais écrire. */
+export const LECTURE_SEULE = new Set(['maire']);
+export const consulteSeulement = (role) => LECTURE_SEULE.has(role);
+
 /** Le rôle donne accès à ce que peuvent les rôles au-dessous. */
-const NIVEAU = { agent: 1, superviseur: 2, admin_commune: 3, super_admin: 4 };
+// Le maire est au niveau du superviseur : il voit tous les écrans de
+// consultation de sa commune. Ce n'est pas une équivalence de pouvoir — ce
+// qu'il peut écrire est fermé par l'API, à l'authentification.
+const NIVEAU = {
+  agent: 1, superviseur: 2, maire: 2, admin_commune: 3, super_admin: 4,
+};
 export const auMoins = (role, minimum) => (NIVEAU[role] ?? 0) >= (NIVEAU[minimum] ?? 99);

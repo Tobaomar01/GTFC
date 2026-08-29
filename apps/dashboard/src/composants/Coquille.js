@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { deconnexion, profilCourant } from '@/lib/api';
-import { ROLES, auMoins } from '@/lib/format';
+import { ROLES, auMoins, consulteSeulement } from '@/lib/format';
 
 const PAGES = [
   { href: '/tableau-bord', libelle: "Vue d'ensemble", icone: '▤', role: 'superviseur' },
@@ -99,6 +99,12 @@ export default function Coquille({ children }) {
           <p className="truncate text-[13px] font-medium text-encre">{profil?.nom_complet}</p>
           <p className="mb-2 truncate text-[11px] text-encre-attenuee">
             {ROLES[profil?.role] ?? profil?.role}
+            {consulteSeulement(profil?.role) ? (
+              // Dit une fois, à sa place. Sans cela, le maire découvrirait la
+              // restriction en butant sur un bouton, ce qui se lit comme une
+              // panne plutôt que comme un partage des rôles.
+              <span className="ml-1 text-encre-attenuee">· consultation seule</span>
+            ) : null}
           </p>
           <button type="button" onClick={deconnexion}
             className="w-full rounded-lg border border-bordure px-3 py-1.5 text-[13px] text-encre-2 hover:bg-surface-alt"

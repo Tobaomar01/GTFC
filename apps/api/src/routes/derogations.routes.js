@@ -22,10 +22,17 @@ const { requete } = require('../config/database');
 const { erreurs } = require('../utils/erreurs');
 const { ok, cree, asyncHandler } = require('../utils/reponse');
 const { valider, paramsId, uuid, texteCourt, montantXof } = require('../middleware/validation');
-const { exigerChefProjet } = require('../middleware/auth');
+const { authentifier, exigerCommune, exigerChefProjet } = require('../middleware/auth');
 const { limiteEcriture } = require('../middleware/limites');
 
 const router = express.Router();
+
+// Ce routeur n'appliquait PAS l'authentification, contrairement à tous les
+// autres. `exigerChefProjet` attend `req.utilisateur`, déjà posé par
+// `authentifier` : sans lui il levait « authentification requise », et tout le
+// registre répondait 401 — au chef de projet comme aux autres. La porte était
+// bien gardée, mais fermée pour tout le monde.
+router.use(authentifier, exigerCommune);
 
 // ---------------------------------------------------------------------------
 // GET /derogations — le registre, réservé aux chefs de projet (FR-020k)

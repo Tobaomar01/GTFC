@@ -12,10 +12,58 @@ const jwt = require('jsonwebtoken');
 const config = require('../config/env');
 const { erreurs } = require('../utils/erreurs');
 
-const ROLES = ['agent', 'superviseur', 'admin_commune', 'super_admin'];
+// Tous les rôles existants. `chef_projet` en fait partie même s'il n'apparaît
+// pas dans NIVEAU : il est hors hiérarchie, non inexistant. L'omettre ici a
+// rendu le rôle incréable — la base l'acceptait, les écrans l'attendaient, et
+// aucun chemin ne permettait d'ouvrir le compte.
+const ROLES = ['agent', 'superviseur', 'admin_commune', 'super_admin',
+  'chef_projet', 'maire'];
 
-/** Hiérarchie : un rôle donne accès à ce que peuvent les rôles au-dessous. */
-const NIVEAU = { agent: 1, superviseur: 2, admin_commune: 3, super_admin: 4 };
+/**
+ * Hiérarchie : un rôle donne accès à ce que peuvent les rôles au-dessous.
+ *
+ * Le maire y figure au niveau du superviseur, ce qui lui ouvre tous les
+ * écrans de consultation de sa commune. Ce n'est PAS une équivalence de
+ * pouvoir : ce qu'il peut écrire est fermé plus loin, par `lectureSeule`.
+ * Deux mécanismes distincts pour deux questions distinctes — que peut-il
+ * voir, que peut-il faire.
+ */
+const NIVEAU = {
+  agent: 1, superviseur: 2, maire: 2, admin_commune: 3, super_admin: 4,
+};
+
+/**
+ * Rôles en LECTURE SEULE, quelle que soit la route.
+ *
+ * Le maire constate la recette de sa commune ; il ne recense pas, n'encaisse
+ * pas, ne remet pas de dette et ne modifie pas le barème — celui-ci relève
+ * d'une délibération du conseil municipal, pas d'un écran.
+ *
+ * La règle est posée UNE FOIS, au niveau de l'application, et non route par
+ * route : un garde oublié sur une route neuve rouvrirait la porte en silence,
+ * et personne ne s'en apercevrait avant qu'une écriture n'ait eu lieu.
+ */
+const LECTURE_SEULE = new Set(['maire']);
+
+/** Méthodes qui ne modifient rien. HEAD et OPTIONS relèvent du protocole. */
+const METHODES_LECTURE = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/**
+ * Refuse toute écriture aux rôles de consultation.
+ *
+ * Placé après `authentifier` et avant les routes. Les requêtes anonymes
+ * passent : ce sont les gardes de chaque route qui les traitent.
+ */
+function lectureSeule(req, _res, next) {
+  const role = req.utilisateur?.role;
+  if (!role || !LECTURE_SEULE.has(role)) return next();
+  if (METHODES_LECTURE.has(req.method)) return next();
+
+  return next(erreurs.accesRefuse(
+    'Ce profil est en consultation seule. Les opérations de recensement, '
+    + 'd\'encaissement et de paramétrage relèvent des équipes qui en '
+    + 'répondent.'));
+}
 
 /**
  * Rôles délibérément HORS de la hiérarchie.
@@ -86,7 +134,11 @@ function authentifier(req, _res, next) {
     ip: req.ip,
   };
 
-  return next();
+  // La lecture seule est vérifiée ICI, à l'intérieur de l'authentification,
+  // et non montée séparément : toute route protégée passe par cette fonction,
+  // donc aucune ne peut échapper à la règle. Un intergiciel distinct
+  // s'oublierait sur la prochaine route écrite.
+  return lectureSeule(req, _res, next);
 }
 
 /** N'exige rien, mais renseigne l'utilisateur s'il est présent. */
@@ -153,6 +205,15 @@ const exigerSuperAdmin = exigerRole(['super_admin']);
 const exigerChefProjet = exigerRole(['chef_projet']);
 
 /**
+ * Réserve une route au maire.
+ *
+ * Peu utile en l'état — le maire consulte ce que voit le superviseur — mais
+ * nommé ici pour que l'intention soit disponible le jour où une décision lui
+ * reviendra en propre.
+ */
+const exigerMaire = exigerRole(['maire']);
+
+/**
  * Vérifie qu'un utilisateur rattaché à une commune en a bien une.
  * Sans cela, un compte mal créé passerait le RLS avec un commune_id nul et
  * ne verrait rien, sans message explicite.
@@ -177,6 +238,8 @@ function exigerCommune(req, _res, next) {
 
 module.exports = {
   ROLES,
+  lectureSeule,
+  exigerMaire,
   NIVEAU,
   signerJetonAcces,
   verifierJeton,
