@@ -53,6 +53,7 @@ Les faire échouer doit demander une décision, pas un correctif distrait.
 | `derogations.test.js` | Qui saisit, qui valide, qui ne peut ni l'un ni l'autre |
 | `maire.test.js` | Le profil de consultation et ses seules écritures |
 | `audit-concurrent.test.js` | La chaîne d'audit sous écritures simultanées |
+| `surface-publique.test.js` | Ce que voit — et ce que laisse — un passant |
 
 Le test le plus important est celui du **silence USSD** : une réponse qui
 différerait entre un numéro inconnu et un numéro non vérifié permettrait

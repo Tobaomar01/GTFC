@@ -132,6 +132,28 @@ const purgerSessions = tache('sessions', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// 5 bis. Anonymisation des lectures publiques de QR — tous les jours, 03h30
+//
+// Une lecture de sticker par un PASSANT enregistre son adresse et son
+// navigateur. La personne n'est ni redevable, ni agent : son adresse n'est
+// nécessaire ni à l'identification du redevable, ni au recouvrement, et la
+// conserver sans terme contrevient à la minimisation des données.
+//
+// L'événement subsiste — savoir qu'un sticker a été lu, quand, sur quel
+// commerce, sert aux statistiques et à repérer un sticker arraché ou recopié.
+// Seuls les identifiants du lecteur s'effacent, après une fenêtre courte qui
+// laisse le temps de détecter une lecture massive et automatisée du registre.
+//
+// Les scans d'agent ne sont jamais touchés : l'action est professionnelle et
+// sa traçabilité est un principe du dispositif.
+// ---------------------------------------------------------------------------
+const anonymiserScans = tache('scans-publics', async () => {
+  const { rows } = await db.requete(CONTEXTE,
+    'SELECT app.anonymiser_scans_publics(30) AS nb');
+  return { lectures_anonymisees: rows[0].nb };
+});
+
+// ---------------------------------------------------------------------------
 // 6. Transactions Wave expirées — toutes les heures
 // Un lien de paiement non honoré dans les 24 h est marqué expiré, sinon il
 // resterait indéfiniment « en attente » dans les statistiques.
@@ -310,6 +332,7 @@ const taches = [
   ['*/15 * * * *', traiterNotifications, 'Traitement de la file de notifications'],
   ['*/10 * * * *', genererQuittancesManquantes, 'Génération des quittances PDF'],
   ['0 3 * * 0', purgerSessions, 'Purge des sessions expirées'],
+  ['30 3 * * *', anonymiserScans, 'Anonymisation des lectures publiques de QR'],
   ['0 * * * *', expirerTransactions, 'Expiration des liens de paiement'],
   ['30 6 * * *', controlerCoherence, 'Contrôle de cohérence quotidien'],
 ];
