@@ -321,6 +321,38 @@ router.get('/exports/commerces.xlsx',
     return res.send(resultat.buffer);
   }));
 
+/*
+ * Exports de réversibilité — formats ouverts et documentés (FR-064, SC-018).
+ *
+ * Excel et PDF servent le travail quotidien. Ils ne servent pas la
+ * réversibilité : dans un partenariat public-privé, la commune doit pouvoir
+ * reprendre ses données sans l'outil qui les a produites.
+ */
+router.get('/exports/commerces.csv',
+  valider(filtresCommerces, 'query'),
+  asyncHandler(async (req, res) => {
+    const r = await exports_.commercesCsv(await contexteEnrichi(req), req.query);
+    res.type('text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition',
+      `attachment; filename="${nomFichier('commerces', 'csv')}"`);
+    res.setHeader('X-Nb-Lignes', String(r.nbLignes));
+    return res.send(r.contenu);
+  }));
+
+router.get('/exports/commerces.geojson',
+  valider(filtresCommerces, 'query'),
+  asyncHandler(async (req, res) => {
+    const r = await exports_.commercesGeoJson(await contexteEnrichi(req), req.query);
+    res.type('application/geo+json');
+    res.setHeader('Content-Disposition',
+      `attachment; filename="${nomFichier('commerces', 'geojson')}"`);
+    res.setHeader('X-Nb-Lignes', String(r.nbLignes));
+    // Une unité sans position est écartée, jamais placée à zéro. On le dit,
+    // sans quoi l'écart entre les deux exports resterait inexpliqué.
+    if (r.sansPosition > 0) res.setHeader('X-Sans-Position', String(r.sansPosition));
+    return res.send(JSON.stringify(r.contenu));
+  }));
+
 router.get('/exports/commerces.pdf',
   valider(filtresCommerces, 'query'),
   asyncHandler(async (req, res) => {

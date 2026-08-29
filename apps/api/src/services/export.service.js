@@ -529,4 +529,96 @@ async function recouvrementPdf(contexte, { periodeId = null } = {}) {
   return { buffer: await versBuffer(doc) };
 }
 
-module.exports = { commercesExcel, commercesPdf, paiementsExcel, recouvrementPdf, PLAFOND };
+
+// ===========================================================================
+//  RÉVERSIBILITÉ — CSV et GeoJSON (FR-064, SC-018)
+//
+//  Excel et PDF servent au travail quotidien de la mairie. Ils ne servent
+//  PAS la réversibilité : dans un partenariat public-privé, la commune doit
+//  pouvoir reprendre ses données sans l'outil qui les a produites, ni le
+//  partenaire qui l'exploite. Cela suppose des formats ouverts et documentés.
+// ===========================================================================
+
+/** Échappement conforme au RFC 4180. */
+function champCsv(v) {
+  if (v === null || v === undefined) return '';
+  const t = v instanceof Date ? v.toISOString() : String(v);
+  return /[";\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+}
+
+/**
+ * Point-virgule et BOM UTF-8. Sans eux, Excel en configuration francophone
+ * met tout dans une seule colonne et casse les accents — un export illisible
+ * par la mairie n'est pas un export.
+ */
+function versCsv(lignes, colonnes) {
+  const entete = colonnes.map((c) => champCsv(c.titre)).join(';');
+  const corps = lignes.map((l) => colonnes.map((c) => champCsv(l[c.cle])).join(';'));
+  return `\ufeff${[entete, ...corps].join('\r\n')}\r\n`;
+}
+
+const COLONNES_COMMERCES_CSV = [
+  { cle: 'code', titre: 'Code' },
+  { cle: 'enseigne', titre: 'Enseigne' },
+  { cle: 'categorie', titre: 'Categorie' },
+  { cle: 'zone', titre: 'Zone' },
+  { cle: 'quartier', titre: 'Quartier' },
+  { cle: 'rue', titre: 'Rue' },
+  { cle: 'statut', titre: 'Statut' },
+  { cle: 'statut_fiscal', titre: 'Statut fiscal' },
+  { cle: 'solde_du', titre: 'Solde du (FCFA)' },
+  { cle: 'longitude', titre: 'Longitude' },
+  { cle: 'latitude', titre: 'Latitude' },
+];
+
+async function commercesCsv(contexte, filtres = {}) {
+  const lignes = await donneesCommerces(contexte, filtres);
+  await tracerExport(contexte, {
+    format: 'csv', entite: 'commerces', filtres, nbLignes: lignes.length });
+  return { contenu: versCsv(lignes, COLONNES_COMMERCES_CSV), nbLignes: lignes.length };
+}
+
+/**
+ * GeoJSON aux propriétés PLATES : un GeoJSON imbriqué ne s'ouvre pas dans
+ * QGIS sans retraitement, ce qui manquerait le but.
+ *
+ * Une unité sans position est ÉCARTÉE, jamais placée à zéro : un point au
+ * large du golfe de Guinée fausserait toute lecture cartographique.
+ */
+async function commercesGeoJson(contexte, filtres = {}) {
+  const lignes = await donneesCommerces(contexte, filtres);
+
+  const features = lignes
+    .filter((l) => l.longitude !== null && l.latitude !== null)
+    .map((l) => {
+      const proprietes = { ...l };
+      delete proprietes.longitude;
+      delete proprietes.latitude;
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [Number(l.longitude), Number(l.latitude)] },
+        properties: proprietes,
+      };
+    });
+
+  await tracerExport(contexte, {
+    format: 'geojson', entite: 'commerces', filtres, nbLignes: features.length });
+
+  return {
+    contenu: {
+      type: 'FeatureCollection',
+      // Le système de référence est explicite : sans lui, un lecteur doit
+      // deviner, et devine parfois mal.
+      crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } },
+      features,
+    },
+    nbLignes: features.length,
+    sansPosition: lignes.length - features.length,
+  };
+}
+
+module.exports = {
+  commercesExcel, commercesPdf, paiementsExcel, recouvrementPdf,
+  commercesCsv, commercesGeoJson, versCsv, champCsv,
+  PLAFOND,
+};

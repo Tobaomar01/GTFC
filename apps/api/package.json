@@ -16,13 +16,15 @@
     "creer-utilisateur": "node scripts/creer-utilisateur.js",
     "verifier-config": "node scripts/verifier-config.js",
     "test": "node --test $(find tests -name '*.test.js')",
-    "test:recette": "DATABASE_URL=${DATABASE_URL_TEST:-postgres://localhost/gtfc_recette} node --test $(find tests -name '*.test.js')"
+    "test:recette": "DATABASE_URL=${DATABASE_URL_TEST:-postgres://localhost/gtfc_recette} node --test $(find tests -name '*.test.js')",
+    "init-minio": "node scripts/init-minio.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.658.0",
     "@aws-sdk/s3-request-presigner": "^3.658.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "express": "^4.21.0",
     "express-rate-limit": "^7.4.0",
