@@ -226,7 +226,8 @@ verifier "Sans jeton, l'API refuse" "$?" "(reçu $code)"
 # D'où un second accès, distinct de psql_admin.
 psql_app() {
   if docker inspect -f '{{.State.Running}}' "$PG_CONTENEUR" 2>/dev/null | grep -q true; then
-    psql_app psql -tAX -U "${DB_USER}" -d "${DB_NAME}" "$@"
+    docker exec -e PGPASSWORD="${DB_PASSWORD}" "$PG_CONTENEUR" \
+      psql -tAX -U "${DB_USER}" -d "${DB_NAME}" "$@"
   else
     PGPASSWORD="${DB_PASSWORD}" psql -tAX -h "${DB_HOST:-127.0.0.1}" \
       -U "${DB_USER}" -d "${DB_NAME}" "$@"
@@ -388,7 +389,7 @@ fi
 # recette sur un comportement correct : on écarte donc les paiements annulés.
 quittanceId=$(psql_admin -c "SELECT q.id FROM app.quittance q
     JOIN app.paiement p ON p.id = q.paiement_id
-   WHERE p.annule_le IS NULL ORDER BY q.cree_le DESC LIMIT 1" | tr -d ' ')
+   WHERE p.annule_le IS NULL ORDER BY q.genere_le DESC LIMIT 1" | tr -d ' ')
 if [[ -n "$quittanceId" ]]; then
   codeHttp=$(curl -s -o /dev/null -w '%{http_code}' -m 30 "${H[@]}" "$API/quittances/$quittanceId/pdf")
   [[ "$codeHttp" == "200" || "$codeHttp" == "302" ]]
