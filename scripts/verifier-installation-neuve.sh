@@ -134,10 +134,16 @@ echo "==> Jeu de tests sur cette base neuve"
 # PIPESTATUS, un test en échec passait inaperçu et le script annonçait quand
 # même la réussite. Un vérificateur qui se trompe est pire que pas de
 # vérificateur.
+#
+# Le rapporteur est IMPOSÉ. `node --test` choisit « spec » sur un terminal et
+# TAP partout ailleurs — or la sortie part toujours dans un tuyau, donc c'était
+# toujours TAP, et le filtre ci-dessous, écrit pour « spec », ne retenait
+# jamais rien. Le script annonçait l'échec sans une ligne de diagnostic, ce qui
+# laisse le lecteur devant un verdict qu'il ne peut pas instruire.
 ( cd apps/api && LOG_LEVEL=silent \
     DATABASE_URL_TEST="postgres://localhost/$BASE" \
     DB_NAME="$BASE" DB_USER="$APP_DB_USER" DB_PASSWORD="$APP_DB_PASSWORD" \
-    node --test $(find tests -name '*.test.js') 2>&1 ) \
+    node --test --test-reporter=spec $(find tests -name '*.test.js') 2>&1 ) \
   | grep -E '^ℹ (tests|pass|fail)|^✖ [a-zé]'
 statut_tests=${PIPESTATUS[0]}
 
