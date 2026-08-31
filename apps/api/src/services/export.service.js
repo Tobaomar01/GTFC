@@ -392,12 +392,12 @@ async function paiementsExcel(contexte, filtres = {}) {
   feuille.getColumn('montant').numFmt = '# ##0 "F"';
   feuille.getColumn('date').numFmt = 'dd/mm/yyyy hh:mm';
 
-  feuille.eachRow((ligne, numero) => {
-    if (numero === 1) return;
-    if (ligne.getCell('verse').value === 'NON VERSÉ') {
-      ligne.getCell('verse').font = { bold: true, color: { argb: 'FFB3261E' } };
-    }
-  });
+  // Il y avait ici une mise en évidence des paiements « NON VERSÉ » : un
+  // reliquat de l'encaissement en espèces, retiré par FR-025b et FR-030. La
+  // colonne `verse` n'existe plus, et ExcelJS répond à une clé inconnue par
+  // « Out of bounds » — l'export rendait donc 500 dès qu'il y avait une ligne
+  // à parcourir. Sur une base sans paiement, la boucle ne voyait que
+  // l'en-tête et le défaut restait invisible.
 
   // Ligne de total, en gras : c'est le chiffre que cherche le receveur.
   const total = rows.reduce((s, p) => s + montantXof(p.montant), 0);
