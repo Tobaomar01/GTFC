@@ -139,7 +139,7 @@ demarrer() {
     info "Démarrage de PostgreSQL + PostGIS…"
     docker run -d --name gtfc-demo-db \
       -e POSTGRES_PASSWORD=demo -e POSTGRES_DB=gtfc_demo -e TZ=Africa/Dakar \
-      -p ${PORT_DB}:5432 postgis/postgis:16-3.4 >/dev/null
+      -p ${PORT_DB}:5432 postgis/postgis:17-3.5 >/dev/null
     for i in $(seq 1 60); do
       docker exec gtfc-demo-db pg_isready -U postgres -d gtfc_demo >/dev/null 2>&1 && break
       sleep 2

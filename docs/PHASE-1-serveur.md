@@ -1,6 +1,6 @@
 # Phase 1 — Configuration du serveur
 
-**Objectif** : disposer d'un serveur Ubuntu opérationnel, avec PostgreSQL 16 + PostGIS,
+**Objectif** : disposer d'un serveur Ubuntu opérationnel, avec PostgreSQL 17 + PostGIS,
 MinIO, Nginx en HTTPS et des sauvegardes automatiques — **avant** d'écrire la moindre
 ligne de code applicatif.
 

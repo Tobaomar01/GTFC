@@ -48,7 +48,7 @@ pilote ; l'ajout d'une nouvelle commune ne demande ni nouveau serveur ni nouveau
         └─────────┬─────────┘
                   │
         ┌─────────┴──────────┐
-        │ PostgreSQL 16      │   PostGIS : détection du quartier par GPS
+        │ PostgreSQL 17      │   PostGIS : détection du quartier par GPS
         │ + PostGIS (Docker) │   Schémas : app / ref / audit
         └────────────────────┘
 

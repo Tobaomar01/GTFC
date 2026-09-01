@@ -2,7 +2,7 @@
 #  Plateforme de collecte des taxes locales — GTFC
 #  Phase 1 : infrastructure serveur
 #
-#  Services conteneurisés  : PostgreSQL 16 + PostGIS, MinIO, Nginx, Certbot
+#  Services conteneurisés  : PostgreSQL 17 + PostGIS, MinIO, Nginx, Certbot
 #  Services gérés par PM2  : API Node.js (phase 3), Dashboard Next.js (phase 6)
 #
 #  Démarrage :  docker compose up -d
@@ -15,10 +15,10 @@ name: gtfc
 services:
 
   # --------------------------------------------------------------------------
-  # Base de données : PostgreSQL 16 + PostGIS 3.4
+  # Base de données : PostgreSQL 17 + PostGIS 3.5
   # --------------------------------------------------------------------------
   postgres:
-    image: postgis/postgis:16-3.4
+    image: postgis/postgis:17-3.5
     container_name: gtfc-postgres
     restart: unless-stopped
     environment:

@@ -230,6 +230,11 @@ J'ai appliqué l'intégralité des migrations et des seeds dans un conteneur
 `postgis/postgis:16-3.4` jetable, puis exécuté les contrôles ci-dessus. Résultats
 observés :
 
+> **Note du 01/09/2026.** La version exigée est passée à PostgreSQL 17 : la 16
+> refuse de lire les sauvegardes produites par la 17, et son `pg_dump` rend un
+> fichier de zéro octet sans le signaler. Le compte rendu ci-dessous est laissé
+> tel qu'il a été écrit — il dit ce qui a été fait à l'époque, sous la 16.
+
 - 16 migrations et 6 seeds appliqués sans erreur, base recréée de zéro
 - 55 tables, 60 commerces répartis en 22 à jour / 10 partiels / 28 impayés
 - détection du quartier par polygone confirmée sur un point au centre de la commune

@@ -249,6 +249,10 @@ J'ai monté un environnement complet — PostgreSQL 16 + PostGIS et MinIO en
 conteneurs, les 18 migrations, les 6 jeux de données — puis exécuté **74 tests de
 bout en bout** contre l'API réellement démarrée. Tous passent.
 
+> **Note du 01/09/2026.** La version exigée est passée à PostgreSQL 17. Ce
+> compte rendu est laissé tel qu'il a été écrit : il dit ce qui a été vérifié à
+> l'époque, sous la 16.
+
 **Authentification et droits** — connexion, message d'erreur identique que le
 compte existe ou non, rotation du jeton de rafraîchissement, détection de
 réutilisation d'un jeton révoqué (toutes les sessions sont coupées), hiérarchie
