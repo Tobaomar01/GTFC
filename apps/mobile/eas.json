@@ -14,8 +14,9 @@
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
       },
+      "_commentaire": "L'adresse du poste change a chaque reseau. Un marqueur A_REMPLIR plutot qu'une IP plausible : oublie, il fait afficher « Cet APK n'est pas pret pour le terrain » des l'ecran de connexion, alors qu'une ancienne IP echouerait en silence sur le terrain. Pour la relever : Windows 'ipconfig' (carte Wi-Fi), macOS 'ipconfig getifaddr en0', Linux 'hostname -I'.",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.1.7:4000"
+        "EXPO_PUBLIC_API_URL": "http://A_REMPLIR_ADRESSE_DU_POSTE:4000"
       }
     },
 

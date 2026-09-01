@@ -16,16 +16,39 @@ Aucun compte, aucun APK, cinq minutes.
 **Sur le poste**, deux services :
 
 ```bash
-# L'API, ouverte au réseau local et non à la seule boucle locale
-cd apps/api && HOST=0.0.0.0 DB_NAME=gtfc_recette npm start
+# L'API, ouverte au réseau local et non à la seule boucle locale.
+# La variable est API_HOST : le serveur ne lit pas HOST.
+cd apps/api && API_HOST=0.0.0.0 DB_NAME=gtfc_recette npm start
 
 # L'application, dans un autre terminal
 cd apps/mobile && npx expo start
 ```
 
+La base doit tourner. Si elle est en conteneur : `docker start gtfc-postgres`.
+
 **Sur le téléphone** : installer *Expo Go* depuis le Play Store, puis scanner
 le QR affiché par la commande précédente. Le téléphone et le poste doivent
 être sur le même Wi-Fi.
+
+**Sous Windows, deux obstacles de plus.** Le pare-feu classe la plupart des
+réseaux Wi-Fi en « Public » et bloque alors tout entrant : ni l'API sur 4000,
+ni Metro sur 8081 ne seront joignables depuis le téléphone. Dans un PowerShell
+administrateur, une fois :
+
+```powershell
+New-NetFirewallRule -DisplayName "GTFC API 4000"   -Direction Inbound -LocalPort 4000 -Protocol TCP -Action Allow
+New-NetFirewallRule -DisplayName "GTFC Metro 8081" -Direction Inbound -LocalPort 8081 -Protocol TCP -Action Allow
+```
+
+Si vous préférez ne rien ouvrir, `npx expo start --tunnel` fait passer Metro
+par les serveurs d'Expo et se dispense de la règle 8081 — mais l'API, elle,
+reste à joindre directement.
+
+Pour relever l'adresse du poste :
+
+```powershell
+(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' }).IPAddress
+```
 
 Ce que cette voie permet : recenser, relever une position GPS, ajuster le
 point sur la carte, photographier, synchroniser, lire un QR. C'est-à-dire tout
@@ -53,12 +76,22 @@ npx eas-cli build --platform android --profile development
 La compilation se fait chez Expo et rend un lien de téléchargement. L'APK
 s'installe directement sur le téléphone, sans passer par le Play Store.
 
-Le profil `development` pointe sur l'adresse du poste, dans `eas.json`. Elle
-est renseignée à la valeur détectée au moment de l'écriture de ce fichier —
-**vérifiez-la** : elle change quand le poste change de réseau.
+Le profil `development` pointe sur l'adresse du poste, dans `eas.json`. Elle y
+figure désormais comme un marqueur `A_REMPLIR_ADRESSE_DU_POSTE`, à remplacer
+avant chaque compilation — elle change dès que le poste change de réseau.
+
+Le marqueur est délibéré. Une ancienne adresse, plausible, produit un APK qui
+part sur le terrain et échoue en silence ; un marqueur, lui, déclenche
+« Cet APK n'est pas prêt pour le terrain » dès l'écran de connexion. Mieux vaut
+un refus visible qu'une adresse crédible et morte.
+
+```powershell
+(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' }).IPAddress   # Windows
+```
 
 ```bash
-ipconfig getifaddr en0     # sur macOS
+ipconfig getifaddr en0     # macOS
+hostname -I                # Linux
 ```
 
 Le profil `preview` produit l'APK des vrais tests terrain. Il pointe sur le
