@@ -34,6 +34,44 @@ const client = new S3Client({
   forcePathStyle: true,
 });
 
+/**
+ * L'hôte public du magasin d'objets, quand il diffère de l'hôte interne.
+ *
+ * En production l'API parle à MinIO par 127.0.0.1, qui ne sort pas du serveur,
+ * tandis que le navigateur ou le téléphone passe par s3.<domaine>, servi par
+ * Nginx. Les deux hôtes sont donc légitimement différents.
+ */
+const hotePublic = (config.production && config.domaine !== 'localhost')
+  ? `https://s3.${config.domaine}`
+  : null;
+
+/**
+ * Client réservé à la PRÉSIGNATURE.
+ *
+ * SigV4 signe l'en-tête Host. Signer sur l'hôte interne puis réécrire l'hôte
+ * dans l'URL — ce que faisait ce module — produit une URL dont la signature ne
+ * correspond plus à la requête que MinIO reçoit : Nginx transmet `Host: $host`,
+ * donc l'hôte réécrit, et MinIO répond 403 SignatureDoesNotMatch. Mesuré sur un
+ * objet témoin : 200 sur l'hôte signé, 403 sur tout autre.
+ *
+ * On signe donc directement sur l'hôte que le client contactera. Signature et
+ * requête concordent alors par construction, sans retouche après coup.
+ *
+ * Ce client ne sert QU'À signer : aucune requête ne part par lui. Les envois et
+ * suppressions continuent d'emprunter l'hôte interne.
+ */
+const clientPresignature = hotePublic
+  ? new S3Client({
+    endpoint: hotePublic,
+    region: config.stockage.region,
+    credentials: {
+      accessKeyId: config.stockage.accessKey,
+      secretAccessKey: config.stockage.secretKey,
+    },
+    forcePathStyle: true,
+  })
+  : client;
+
 const TYPES_IMAGE_AUTORISES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 /**
@@ -128,24 +166,17 @@ async function televerserObjet({ bucket, chemin, buffer, contentType }) {
 
 /**
  * URL temporaire de consultation.
- * L'URL publique passe par le sous-domaine s3.<domaine> servi par Nginx,
- * pas par l'adresse interne du conteneur MinIO.
+ *
+ * L'URL publique passe par le sous-domaine s3.<domaine> servi par Nginx, pas
+ * par l'adresse interne du conteneur MinIO. Elle est SIGNÉE sur cet hôte-là :
+ * voir clientPresignature ci-dessus pour la raison.
  */
 async function urlSignee(bucket, chemin, secondes = config.stockage.dureeUrlSigneeSecondes) {
-  const url = await getSignedUrl(
-    client,
+  return getSignedUrl(
+    clientPresignature,
     new GetObjectCommand({ Bucket: bucket, Key: chemin }),
     { expiresIn: secondes },
   );
-
-  if (config.production && config.domaine !== 'localhost') {
-    const interne = new URL(url);
-    interne.protocol = 'https:';
-    interne.host = `s3.${config.domaine}`;
-    interne.port = '';
-    return interne.toString();
-  }
-  return url;
 }
 
 async function supprimerObjet(bucket, chemin) {
