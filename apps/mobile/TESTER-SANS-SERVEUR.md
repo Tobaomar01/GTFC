@@ -24,7 +24,25 @@ cd apps/api && API_HOST=0.0.0.0 DB_NAME=gtfc_recette npm start
 cd apps/mobile && npx expo start
 ```
 
-La base doit tourner. Si elle est en conteneur : `docker start gtfc-postgres`.
+**L'adresse de l'API est lue dans `apps/mobile/.env`**, pas devinée. Sans ce
+fichier, l'application retombe sur `extra.apiUrl` d'`app.json` —
+`https://api.exemple.sn`, une adresse de remplissage — et l'écran de connexion
+affiche « Cet APK n'est pas prêt pour le terrain » sans rien laisser saisir.
+Metro n'inline les `EXPO_PUBLIC_*` qu'au démarrage : après modification du
+fichier, relancer `expo start`.
+
+```bash
+cd apps/mobile && cp .env.example .env
+# puis y porter l'adresse du poste relevée plus bas, port 4000
+```
+
+La base doit tourner. Si elle est en conteneur, son nom n'est pas devinable —
+le relever plutôt que le recopier :
+
+```bash
+docker ps -a --format '{{.Names}}	{{.Status}}	{{.Ports}}'   # ex. gtfc-pg17
+docker start gtfc-pg17
+```
 
 **Sur le téléphone** : installer *Expo Go* depuis le Play Store, puis scanner
 le QR affiché par la commande précédente. Le téléphone et le poste doivent
