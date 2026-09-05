@@ -91,8 +91,27 @@ test('un sticker remplacé répond quand même, en le disant', async () => {
   // L'agent a recollé un sticker neuf, l'ancien traîne sur la devanture. Un
   // 404 ferait croire à une erreur ; mieux vaut orienter.
   await enTransaction(async (client) => {
+    // Le sticker doit être posé sur un commerce VIVANT. Ce test éprouve le
+    // REMPLACEMENT d'un sticker, pas l'ARCHIVAGE d'un commerce — que la
+    // fonction écarte à bon droit, et qui rend donc zéro ligne.
+    //
+    // Sans cette condition, « WHERE actif LIMIT 1 » tirait au sort entre les
+    // deux cas. Et le sort penchait un peu plus du mauvais côté à chaque
+    // passage de la suite : parcours-terrain.test.js archive ses commerces
+    // de test sans désactiver leur QR, si bien que chaque exécution ajoutait
+    // un sticker actif sur un commerce archivé. Un test qui se dégrade à
+    // force d'être joué.
+    //
+    // ORDER BY parce qu'un LIMIT sans tri ne désigne rien de stable : le même
+    // test, la même base, et deux réponses selon l'humeur du planificateur.
     const { rows: [qr] } = await client.query(`
-      SELECT jeton FROM app.qr_code WHERE actif LIMIT 1`);
+      SELECT q.jeton
+        FROM app.qr_code q
+        JOIN app.commerce c ON c.id = q.commerce_id
+       WHERE q.actif AND c.archive_le IS NULL
+       ORDER BY q.genere_le, q.id
+       LIMIT 1`);
+    assert.ok(qr, 'aucun sticker actif sur un commerce vivant : jeu de données inutilisable');
     // La base refuse une désactivation sans date — bonne contrainte : un
     // sticker retiré sans qu'on sache quand laisserait une devanture sans
     // explication.
