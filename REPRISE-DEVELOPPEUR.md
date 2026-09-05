@@ -69,7 +69,7 @@ ailleurs (les tirets remplacent les barres obliques).
 
 ## 2. Vérifier que la reprise a réussi
 
-Cinq commandes. Les cinq doivent passer.
+Six commandes. Les six doivent passer.
 
 ```bash
 # Installation depuis une base vide, puis les 122 tests
@@ -83,6 +83,9 @@ bash scripts/repetition-generale.sh gtfc_recette
 
 # Les douze tâches automatiques
 cd apps/api && DB_NAME=gtfc_recette node src/scheduler.js --une-fois
+
+# Le magasin d'objets se sauvegarde et se restaure à l'identique
+bash scripts/exercice-restauration-minio.sh
 
 # Les défauts qu'aucun test ne voit — la sortie doit être VIDE
 npx eslint@9 --config eslint.defauts.mjs \
@@ -169,8 +172,9 @@ contester deviendrait un moyen de ne pas payer.
 
 122 tests API · 18 tests de navigateur · 12 contrôles de répétition générale ·
 31 contrôles de recette · installation depuis une base vide · sauvegarde
-restaurée, chaîne d'audit intacte après restauration · douze tâches
-automatiques exécutées.
+PostgreSQL restaurée, chaîne d'audit intacte après restauration · sauvegarde
+du magasin d'objets restaurée dans des buckets témoins et comparée à
+l'original · douze tâches automatiques exécutées.
 
 Les six chemins que la constitution impose d'éprouver sont couverts.
 
