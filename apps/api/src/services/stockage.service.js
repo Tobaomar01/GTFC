@@ -15,7 +15,7 @@ const crypto = require('crypto');
 const path = require('path');
 const {
   S3Client, PutObjectCommand, GetObjectCommand,
-  DeleteObjectCommand, HeadBucketCommand,
+  DeleteObjectCommand, HeadBucketCommand, HeadObjectCommand,
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const config = require('../config/env');
@@ -179,6 +179,26 @@ async function urlSignee(bucket, chemin, secondes = config.stockage.dureeUrlSign
   );
 }
 
+/**
+ * L'objet est-il réellement dans le magasin ?
+ *
+ * Une ligne en base qui porte un chemin ne prouve pas que le fichier existe :
+ * un dump PostgreSQL restauré sans son magasin d'objets laisse toutes les
+ * lignes intactes et tous les objets absents. Sans cette vérification, l'API
+ * redirige vers une URL pré-signée pointant sur rien, et le client reçoit un
+ * XML S3 brut au lieu d'une erreur de l'API.
+ */
+async function objetExiste(bucket, chemin) {
+  try {
+    await client.send(new HeadObjectCommand({ Bucket: bucket, Key: chemin }));
+    return true;
+  } catch (err) {
+    if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) return false;
+    // Panne du magasin : on ne conclut pas à l'absence, on laisse remonter.
+    throw err;
+  }
+}
+
 async function supprimerObjet(bucket, chemin) {
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: chemin }));
 }
@@ -206,6 +226,7 @@ module.exports = {
   televerserPhoto,
   televerserObjet,
   urlSignee,
+  objetExiste,
   supprimerObjet,
   verifierConnexion,
   construireChemin,

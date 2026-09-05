@@ -265,7 +265,18 @@ async function genererQuittance(contexte, paiementId, { forcer = false } = {}) {
   if (!q) throw erreurs.introuvable('Quittance');
   if (q.annule_le) throw erreurs.conflit('Ce paiement a été annulé : aucune quittance ne peut être émise');
 
-  if (q.chemin_pdf && !forcer) {
+  // Un chemin en base ne prouve pas que le fichier est encore dans le magasin.
+  // Un dump PostgreSQL restauré sans son magasin d'objets laisse toutes les
+  // lignes intactes et tous les objets absents ; un envoi interrompu après
+  // l'UPDATE laisse la même trace. Se fier à la colonne seule fait rediriger
+  // l'agent vers une URL pré-signée qui pointe sur rien, et ce qu'il reçoit
+  // n'est même pas une erreur de l'API : c'est un XML S3 brut.
+  //
+  // On le demande donc au magasin. Si l'objet manque, on retombe sur la
+  // génération — ce que la route promet déjà : « généré à la volée s'il
+  // n'existe pas encore ». La quittance est reconstruite, réenvoyée, et la
+  // ligne remise d'aplomb.
+  if (q.chemin_pdf && !forcer && await stockage.objetExiste(q.bucket, q.chemin_pdf)) {
     return { deja: true, bucket: q.bucket, chemin: q.chemin_pdf, numero: q.numero };
   }
 
