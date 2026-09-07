@@ -166,6 +166,8 @@ app.use('/', require('./routes/stats.routes'));        // /stats, /audit
 app.use('/', require('./routes/documents.routes')); // /quittances, /impression, /campagnes, /notifications
 app.use('/redevables', require('./routes/redevables.routes'));
 app.use('/rues', require('./routes/rues.routes'));
+
+app.use('/feuilles-de-route', require('./routes/feuilles.routes'));
 app.use('/', require('./routes/objets.routes'));        // /affichages, /chantiers
 app.use('/', require('./routes/contestations.routes')); // /contestations, /motifs-contestation
 // Décisions dérogatoires — montants forcés et exonérations, les deux
