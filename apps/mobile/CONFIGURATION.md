@@ -88,3 +88,51 @@ Ces paquets ne sont **pas embarqués dans l'APK** : ils servent à le fabriquer.
 Ce qu'il faut surveiller, en revanche : les versions du SDK Expo. Une montée
 de version majeure, une à deux fois par an, apporte les correctifs de sécurité
 de toute la chaîne.
+
+---
+
+# Les profils de compilation — `eas.json`
+
+`eas.json` doit rester **strictement conforme au schéma EAS**, exactement comme
+`app.json` l'est au schéma Expo. Une clé étrangère — un `_commentaire`, même
+bien intentionné — fait échouer `eas init` et `eas build` avec « eas.json is
+not valid ». Les explications qui y vivaient sont donc ici.
+
+## Trois profils
+
+`preview` produit un APK installable directement sur le téléphone d'un agent,
+sans passer par Google Play : c'est celui des tests terrain de la phase 7.
+Aucun compte Google Play n'est nécessaire à ce stade — l'APK se transfère aux
+téléphones des trois agents pilotes.
+
+`production` produit un `.aab` (app-bundle), format exigé par Google Play, et
+**non installable directement** sur un téléphone.
+
+`development` produit un client de développement, qui se connecte au Metro du
+poste.
+
+## Pourquoi un marqueur `A_REMPLIR` et non une adresse
+
+Le profil `development` pointe sur l'adresse du poste, qui change à chaque
+réseau. Elle y figure comme marqueur `A_REMPLIR_ADRESSE_DU_POSTE`, et c'est
+délibéré : oubliée, elle fait afficher « Cet APK n'est pas prêt pour le
+terrain » dès l'écran de connexion, alors qu'une ancienne adresse — plausible —
+compilerait sans un mot et échouerait en silence sur le terrain.
+
+Pour relever l'adresse du poste : `ipconfig` sous Windows (carte Wi-Fi),
+`ipconfig getifaddr en0` sous macOS, `hostname -I` sous Linux.
+
+Les profils `preview` et `production` portent `https://api.A_REMPLIR.sn` pour
+la même raison : le domaine de la commune n'existe pas encore.
+
+## Dépôt sur Google Play
+
+Le profil de soumission vise la piste `internal` pour commencer : diffusion
+limitée aux testeurs déclarés, sans validation Google. Passer en `production`
+après les tests terrain.
+
+## Après toute modification de `eas.json`
+
+```bash
+npx eas-cli build:configure --platform android   # valide le schéma sans compiler
+```

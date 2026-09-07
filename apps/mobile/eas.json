@@ -3,10 +3,7 @@
     "version": ">= 12.0.0",
     "appVersionSource": "local"
   },
-
   "build": {
-    "_commentaire": "Trois profils. 'preview' produit un APK installable directement sur le telephone d'un agent, sans passer par Google Play : c'est celui des tests terrain de la phase 7.",
-
     "development": {
       "developmentClient": true,
       "distribution": "internal",
@@ -14,12 +11,10 @@
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
       },
-      "_commentaire": "L'adresse du poste change a chaque reseau. Un marqueur A_REMPLIR plutot qu'une IP plausible : oublie, il fait afficher « Cet APK n'est pas pret pour le terrain » des l'ecran de connexion, alors qu'une ancienne IP echouerait en silence sur le terrain. Pour la relever : Windows 'ipconfig' (carte Wi-Fi), macOS 'ipconfig getifaddr en0', Linux 'hostname -I'.",
       "env": {
         "EXPO_PUBLIC_API_URL": "http://A_REMPLIR_ADRESSE_DU_POSTE:4000"
       }
     },
-
     "preview": {
       "distribution": "internal",
       "android": {
@@ -27,10 +22,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.A_REMPLIR.sn"
-      },
-      "_commentaire": "APK a transferer directement sur les telephones des 3 agents pilotes. Aucun compte Google Play necessaire a ce stade."
+      }
     },
-
     "production": {
       "autoIncrement": true,
       "android": {
@@ -38,17 +31,14 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.A_REMPLIR.sn"
-      },
-      "_commentaire": "app-bundle (.aab) : format exige par Google Play. Non installable directement sur un telephone."
+      }
     }
   },
-
   "submit": {
     "production": {
       "android": {
         "serviceAccountKeyPath": "./google-play-service-account.json",
-        "track": "internal",
-        "_commentaire": "Piste 'internal' pour commencer : diffusion limitee aux testeurs declares, sans validation Google. Passer en 'production' apres les tests terrain."
+        "track": "internal"
       }
     }
   }

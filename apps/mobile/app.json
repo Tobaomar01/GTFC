@@ -19,12 +19,12 @@
         "backgroundColor": "#0B5D2B"
       },
       "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "CAMERA",
-        "INTERNET",
-        "ACCESS_NETWORK_STATE",
-        "VIBRATE"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.VIBRATE"
       ],
       "blockedPermissions": [
         "ACCESS_BACKGROUND_LOCATION",
@@ -71,7 +71,10 @@
       "expo-status-bar"
     ],
     "extra": {
-      "apiUrl": "https://api.exemple.sn"
+      "apiUrl": "https://api.exemple.sn",
+      "eas": {
+        "projectId": "3126cb6a-cdfe-4dfa-a1df-181a469bd338"
+      }
     },
     "updates": {
       "enabled": true,
@@ -79,6 +82,7 @@
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "owner": "tobaomar"
   }
 }
