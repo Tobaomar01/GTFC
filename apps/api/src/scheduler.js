@@ -381,6 +381,51 @@ const genererQuittancesManquantes = tache('quittances_pdf', async () => {
 // ===========================================================================
 //  Programmation
 // ===========================================================================
+// ---------------------------------------------------------------------------
+// 13. Feuilles de route du jour — tous les jours, 05h00
+//
+// Composées AVANT que les agents ne partent : un agent qui ouvre son
+// application à six heures doit trouver sa journée prête.
+//
+// La route `/feuilles-de-route/moi` compose aussi à la volée, et c'est
+// délibérément redondant. Si le planificateur n'a pas tourné — serveur
+// redémarré, tâche en échec — l'agent ne reste pas devant une liste vide. La
+// fonction est idempotente : les deux chemins ne peuvent pas se contredire.
+//
+// Un agent sans affectation reçoit une feuille VIDE, pas une erreur. C'est un
+// fait à constater, pas une panne : il faut lui affecter un territoire.
+// ---------------------------------------------------------------------------
+const composerFeuilles = tache('feuilles-de-route', async () => {
+  const { rows } = await db.requete(CONTEXTE, `
+      SELECT u.id AS agent_id,
+             app.composer_feuille_route(u.id, current_date) AS feuille_id
+        FROM app.utilisateur u
+       WHERE u.role = 'agent' AND u.actif AND u.archive_le IS NULL
+       ORDER BY u.nom_complet`);
+
+  const { rows: [compte] } = await db.requete(CONTEXTE, `
+      -- Le meme filtre partout : sans lui, « 19 lignes dont 19 jamais_paye »
+      -- alors qu'une est un ajout manuel et une autre retiree. Un decompte qui
+      -- ne totalise pas son total ne veut rien dire.
+      SELECT count(*) FILTER (WHERE l.retiree_le IS NULL)::int AS lignes,
+             count(DISTINCT f.id)::int                          AS feuilles,
+             count(*) FILTER (WHERE l.retiree_le IS NULL AND l.motif = 'jamais_paye')::int AS jamais_paye,
+             count(*) FILTER (WHERE l.retiree_le IS NULL AND l.motif = 'fiche_a_completer')::int AS a_completer,
+             count(*) FILTER (WHERE l.retiree_le IS NOT NULL)::int AS retirees
+        FROM app.feuille_route f
+        LEFT JOIN app.feuille_route_ligne l ON l.feuille_id = f.id
+       WHERE f.date_tournee = current_date`);
+
+  return {
+    agents: rows.length,
+    feuilles: compte.feuilles,
+    lignes: compte.lignes,
+    dont_jamais_paye: compte.jamais_paye,
+    dont_fiche_a_completer: compte.a_completer,
+    retirees: compte.retirees,
+  };
+});
+
 const taches = [
   ['0 1 25 * *', creerPartitions, 'Création des partitions mensuelles'],
   ['30 1 25 * *', preparerPeriodes, 'Préparation des périodes fiscales'],
@@ -394,6 +439,7 @@ const taches = [
   ['30 3 * * *', anonymiserScans, 'Anonymisation des lectures publiques de QR'],
   ['0 * * * *', expirerTransactions, 'Expiration des liens de paiement'],
   ['30 6 * * *', controlerCoherence, 'Contrôle de cohérence quotidien'],
+  ['0 5 * * *', composerFeuilles, 'Composition des feuilles de route du jour'],
 ];
 
 async function demarrer() {
