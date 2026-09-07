@@ -295,7 +295,28 @@ const facturerLeMois = tache('liquidation_annuelle', async () => {
         liens: campagne.liens_crees,
         notifications: campagne.notifications,
         sans_telephone: campagne.sans_telephone.length,
+
+        // Les echecs de campagne sont COLLECTES par wave.lancerCampagne, puis
+        // ils etaient abandonnes ici : le journal des taches enregistrait
+        // « succes: true » avec des compteurs a zero pendant que douze avis
+        // echouaient dans les journaux du serveur.
+        //
+        // Ce journal existe precisement pour qu'une tache qui echoue a trois
+        // heures du matin ne laisse pas qu'une ligne dans un fichier que
+        // personne ne lit. Encore faut-il qu'il porte ce qui a echoue.
+        //
+        // Les trois premiers messages suffisent a orienter : au-dela, c'est
+        // une panne generale, et le nombre le dit deja.
+        erreurs_campagne: campagne.erreurs.length,
+        detail_erreurs: campagne.erreurs.slice(0, 3),
       };
+
+      if (campagne.erreurs.length > 0) {
+        logger.warn(
+          { commune: c.code, nombre: campagne.erreurs.length },
+          "Campagne : des avis n'ont pas pu recevoir leur lien de paiement",
+        );
+      }
 
       if (campagne.sans_telephone.length > 0) {
         logger.warn(
