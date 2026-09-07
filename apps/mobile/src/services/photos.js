@@ -12,7 +12,13 @@
  * La compression a lieu AU MOMENT DE LA PRISE, pas à l'envoi : le fichier
  * lourd n'occupe jamais durablement le stockage du téléphone.
  */
-import * as FileSystem from 'expo-file-system';
+// Le SDK 54 a réécrit expo-file-system autour de File et Directory, et a
+// déplacé l'API historique — getInfoAsync, moveAsync, documentDirectory et
+// consorts — sous « /legacy ». Ce module en emploie six fonctions, toutes
+// présentes là. On garde donc l'API historique pour l'instant : le passage à
+// la nouvelle mérite d'être fait pour elle-même, pas glissé dans une montée
+// de SDK où l'on ne saurait plus attribuer une régression.
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as sync from '../bdd/sync.repo';
 import { journaliser } from '../bdd/database';

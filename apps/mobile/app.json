@@ -8,11 +8,6 @@
     "primaryColor": "#0B5D2B",
     "icon": "./assets/icone.png",
     "scheme": "gtfc",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0B5D2B"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -70,7 +65,10 @@
         }
       ],
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-status-bar"
     ],
     "extra": {
       "apiUrl": "https://api.exemple.sn"
