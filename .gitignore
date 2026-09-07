@@ -93,3 +93,8 @@ apps/mobile/dist-verif/
 apps/dashboard/test-results/
 apps/dashboard/playwright-report/
 apps/mobile/.export-verif/
+
+# Fichiers engendres par « next dev » a chaque demarrage (Next.js 15+).
+# Ils reapparaissent tout seuls et n'ont pas a suivre le depot.
+apps/dashboard/AGENTS.md
+apps/dashboard/CLAUDE.md
