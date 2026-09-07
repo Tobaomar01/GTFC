@@ -136,9 +136,14 @@ else
 fi
 
 for host in "$APP_DOMAIN" "api.$APP_DOMAIN" "gtfc.$APP_DOMAIN"; do
-    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "https://${host}/" 2>/dev/null || echo "000")
+    # Pas de « || echo 000 » : curl ecrit DEJA 000 quand il echoue, et les deux
+    # se concatenaient en « 000000 ». Ce code ne correspondait alors plus au
+    # motif 000 du case ci-dessous, tombait dans le cas generique, et un hote
+    # TOTALEMENT INJOIGNABLE etait affiche en vert. Le filet desactivait
+    # exactement le controle qu'il devait garantir.
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "https://${host}/" 2>/dev/null)
     case "$code" in
-        000) ko  "https://${host}/ injoignable" ;;
+        000|"") ko  "https://${host}/ injoignable" ;;
         502|503) warn "https://${host}/ → $code (backend pas encore démarré — normal avant les phases 3 et 6)" ;;
         *)   ok  "https://${host}/ → $code" ;;
     esac
@@ -183,16 +188,60 @@ fi
 # ---------------------------------------------------------------------------
 head_ "7. Ressources du serveur"
 # ---------------------------------------------------------------------------
-disk_used=$(df -P / | awk 'NR==2{print $5}' | tr -d '%')
-[[ $disk_used -gt 85 ]] && ko "Disque / occupé à ${disk_used} %" || ok "Disque / : ${disk_used} % occupé ($(df -h / | awk 'NR==2{print $4}') libres)"
+#  UNE MESURE QUI N'A PAS PU ETRE PRISE N'EST PAS UN SUCCES.
+#
+#  Ces trois controles affichaient une coche verte sur du vide des que l'outil
+#  manquait — « Memoire :  % utilisee ( disponibles) », « Uptime : » — ou un
+#  chiffre absurde quand df repondait autrement qu'attendu : « Disque occupe a
+#  325298264 % ». Un controle de sante qui verdit sans donnee ne surveille
+#  rien ; il rassure.
+# ---------------------------------------------------------------------------
+mesure_chiffre() { [[ "$1" =~ ^[0-9]+$ ]]; }
 
-mem_used=$(free | awk '/^Mem:/{printf "%.0f", $3/$2*100}')
-[[ $mem_used -gt 90 ]] && warn "Mémoire utilisée à ${mem_used} %" || ok "Mémoire : ${mem_used} % utilisée ($(free -h | awk '/^Mem:/{print $7}') disponibles)"
+# On compte les colonnes DEPUIS LA DROITE : « Capacity » est l'avant-derniere,
+# juste avant le point de montage. Compter depuis la gauche suppose que le nom
+# du systeme de fichiers ne contient pas d'espace — faux ici, ou df annonce
+# « C:/Program Files/Git » : awk tombait alors sur « Available » et le controle
+# affichait « Disque occupe a 325296200 % ».
+disk_used=$(df -P / 2>/dev/null | awk 'NR==2{print $(NF-1)}' | tr -d '%')
 
-load=$(awk '{print $1}' /proc/loadavg)
-cores=$(nproc)
-ok "Charge : ${load} (sur ${cores} cœurs)"
-ok "Uptime : $(uptime -p 2>/dev/null || uptime)"
+# Un pourcentage hors de 0-100 n'est pas une mesure, c'est une lecture ratee.
+if mesure_chiffre "${disk_used:-}" && [[ "$disk_used" -le 100 ]]; then
+    if [[ "$disk_used" -gt 85 ]]; then
+        ko "Disque / occupé à ${disk_used} %"
+    else
+        ok "Disque / : ${disk_used} % occupé ($(df -h / 2>/dev/null | awk 'NR==2{print $4}') libres)"
+    fi
+else
+    warn "Occupation du disque indéterminable (df a répondu « ${disk_used:-rien} »)"
+fi
+
+if command -v free >/dev/null 2>&1; then
+    mem_used=$(free | awk '/^Mem:/{printf "%.0f", $3/$2*100}')
+    if mesure_chiffre "${mem_used:-}"; then
+        if [[ "$mem_used" -gt 90 ]]; then
+            warn "Mémoire utilisée à ${mem_used} %"
+        else
+            ok "Mémoire : ${mem_used} % utilisée ($(free -h | awk '/^Mem:/{print $7}') disponibles)"
+        fi
+    else
+        warn "Occupation mémoire indéterminable"
+    fi
+else
+    warn "Mémoire non mesurée : la commande « free » est absente"
+fi
+
+if [[ -r /proc/loadavg ]] && command -v nproc >/dev/null 2>&1; then
+    ok "Charge : $(awk '{print $1}' /proc/loadavg) (sur $(nproc) cœurs)"
+else
+    warn "Charge non mesurée : /proc/loadavg ou nproc absent"
+fi
+
+if command -v uptime >/dev/null 2>&1; then
+    ok "Uptime : $(uptime -p 2>/dev/null || uptime)"
+else
+    warn "Uptime non mesuré : la commande « uptime » est absente"
+fi
 
 # ---------------------------------------------------------------------------
 echo
