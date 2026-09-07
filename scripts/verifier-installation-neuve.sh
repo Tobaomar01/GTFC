@@ -36,6 +36,27 @@ command -v psql >/dev/null || { echo "psql introuvable." >&2; exit 1; }
 
 export POSTGRES_USER="${PGUSER:-$(whoami)}" POSTGRES_DB="$BASE"
 export APP_DB_USER="${APP_DB_USER:-gtfc_app}"
+# ---------------------------------------------------------------------------
+#  Le mot de passe du role applicatif vient de .env, PAS d'une valeur d'essai.
+#
+#  UN ROLE POSTGRESQL EST GLOBAL AU CLUSTER, pas propre a une base. Or cette
+#  epreuve appelle infra/postgres/init/02-app-role.sh, qui fait un
+#  « ALTER ROLE ... PASSWORD » INCONDITIONNEL. Avec une valeur d'essai, une
+#  epreuve annoncee comme portant sur « une base jetable » reecrivait le mot de
+#  passe du gtfc_app REEL — et la base de travail ne repondait plus :
+#
+#      password authentication failed for user "gtfc_app"
+#
+#  Mesure : 52 assertions en echec sur 122, toutes pour cette seule raison. Le
+#  diagnostic renvoie vers la base, les migrations, les tests — jamais vers
+#  l'epreuve qu'on vient de jouer.
+#
+#  En reprenant le mot de passe de .env, l'epreuve ne change plus rien : elle
+#  reecrit la meme valeur.
+# ---------------------------------------------------------------------------
+if [ -z "${APP_DB_PASSWORD:-}" ] && [ -f .env ]; then
+    APP_DB_PASSWORD="$(grep -E '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)"
+fi
 export APP_DB_PASSWORD="${APP_DB_PASSWORD:-motdepasse_local}"
 export APP_DB_NAME="$BASE"
 

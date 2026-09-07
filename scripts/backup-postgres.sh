@@ -28,13 +28,33 @@ ROOT_DIR="$(pwd)"
 
 [[ -f .env ]] || { echo "[ERREUR] .env introuvable" >&2; exit 1; }
 # shellcheck disable=SC1091
+
+# ---------------------------------------------------------------------------
+#  L'environnement de l'APPELANT prime sur .env.
+#
+#  « set -a; source .env » ecrase les variables deja posees. Sans cette
+#  precaution, DB_NAME et BACKUP_DIR passent en
+#  ligne de commande sont ignores en
+#  silence, et le script travaille ailleurs que la ou on le croit. Un script
+#  qu'on ne peut pas diriger vers un bac a sable est un script qu'on n'eprouve
+#  jamais — et, ici, une operation qui peut se tromper de cible.
+# ---------------------------------------------------------------------------
+_APPELANT_DB_NAME="${DB_NAME:-}"
+_APPELANT_BACKUP_DIR="${BACKUP_DIR:-}"
 set -a; source .env; set +a
+[[ -n "$_APPELANT_DB_NAME" ]] && DB_NAME="$_APPELANT_DB_NAME"
+[[ -n "$_APPELANT_BACKUP_DIR" ]] && BACKUP_DIR="$_APPELANT_BACKUP_DIR"
 
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/gtfc}"
 RET_DAILY="${BACKUP_RETENTION_DAILY:-14}"
 RET_WEEKLY="${BACKUP_RETENTION_WEEKLY:-8}"
 RET_MONTHLY="${BACKUP_RETENTION_MONTHLY:-12}"
-LOG_FILE="/var/log/gtfc/backup-postgres.log"
+# Le journal suit le dossier de sauvegarde s'il est detourne, et se laisse
+# imposer par LOG_FILE. Fige sur /var/log/gtfc, il faisait echouer le script
+# des la premiere ligne sur tout poste qui n'est pas le serveur — « mkdir:
+# cannot create directory '/var': Permission denied » — alors meme que
+# BACKUP_DIR avait ete correctement detourne.
+LOG_FILE="${LOG_FILE:-${BACKUP_DIR%/}/backup-postgres.log}"
 CONTAINER="$PG_CONTENEUR"
 
 TIMESTAMP="$(date +%Y-%m-%d_%Hh%M)"

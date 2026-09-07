@@ -27,7 +27,20 @@ fail() { echo "${RED}[ERREUR]${NC} $*" >&2; exit 1; }
 cd "$(dirname "$0")/.."
 [[ -f .env ]] || fail ".env introuvable"
 # shellcheck disable=SC1091
+
+# ---------------------------------------------------------------------------
+#  L'environnement de l'APPELANT prime sur .env.
+#
+#  « set -a; source .env » ecrase les variables deja posees. Sans cette
+#  precaution, DB_NAME passe en
+#  ligne de commande est ignore en
+#  silence, et le script travaille ailleurs que la ou on le croit. Un script
+#  qu'on ne peut pas diriger vers un bac a sable est un script qu'on n'eprouve
+#  jamais — et, ici, une operation qui peut se tromper de cible.
+# ---------------------------------------------------------------------------
+_APPELANT_DB_NAME="${DB_NAME:-}"
 set -a; source .env; set +a
+[[ -n "$_APPELANT_DB_NAME" ]] && DB_NAME="$_APPELANT_DB_NAME"
 
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/gtfc}"
 CONTAINER="$PG_CONTENEUR"
@@ -110,17 +123,23 @@ info "Base ${DB_NAME} recréée avec ses extensions"
 
 # --- Restauration -----------------------------------------------------------
 step "4/5  Restauration des données"
-# La restauration parallèle (--jobs) exige un fichier accessible en accès
-# direct : on passe donc par le volume partagé ./infra/postgres/dumps -> /dumps
-# plutôt que par l'entrée standard.
-mkdir -p ./infra/postgres/dumps
-cp "$DUMP_FILE" ./infra/postgres/dumps/_restore.dump
-trap 'rm -f ./infra/postgres/dumps/_restore.dump' EXIT
+# La restauration parallele (--jobs) exige un fichier accessible en acces
+# direct, pas l'entree standard. On le DEPOSE donc dans le conteneur avec
+# « docker cp », qui ne suppose aucun volume.
+#
+# La premiere version passait par un volume partage ./infra/postgres/dumps
+# -> /dumps, en le SUPPOSANT monte. Il ne l'est pas partout : pg_restore ne
+# trouvait aucun fichier, echouait, et le script annoncait quand meme
+# « RESTAURATION TERMINEE » sur une base VIDE.
+MSYS_NO_PATHCONV=1 docker cp "$DUMP_FILE" "${CONTAINER}:/tmp/_restore.dump" >/dev/null \
+    || fail "Impossible de deposer la sauvegarde dans le conteneur ${CONTAINER}."
+trap 'MSYS_NO_PATHCONV=1 docker exec "$CONTAINER" rm -f /tmp/_restore.dump >/dev/null 2>&1 || true' EXIT
 
 docker exec -e PGPASSWORD="$DB_SUPERUSER_PASSWORD" "$CONTAINER" \
     pg_restore -U "$DB_SUPERUSER" -d "$DB_NAME" \
-        --no-owner --no-privileges --jobs=4 /dumps/_restore.dump \
-    || warn "pg_restore a signalé des erreurs — vérifiez le résultat ci-dessus."
+        --no-owner --no-privileges --jobs=4 /tmp/_restore.dump \
+    && RESTAURE_OK=1 \
+    || { RESTAURE_OK=0; warn "pg_restore a signale des erreurs — voir ci-dessus."; }
 
 # Les droits du rôle applicatif ne sont pas dans le dump (--no-privileges)
 docker exec -e PGPASSWORD="$DB_SUPERUSER_PASSWORD" "$CONTAINER" \
@@ -143,7 +162,28 @@ docker exec -e PGPASSWORD="$DB_SUPERUSER_PASSWORD" "$CONTAINER" \
         GROUP BY table_schema ORDER BY table_schema;"
 
 echo
-info "RESTAURATION TERMINÉE"
+# ---------------------------------------------------------------------------
+#  Le controle DECIDE, il ne se contente pas d'afficher.
+#
+#  La premiere version imprimait le tableau ci-dessus puis annoncait
+#  « RESTAURATION TERMINEE » quoi qu'il arrive. Mesure : pg_restore en echec,
+#  « 0 rows » affiche, base VIDE — et succes annonce en vert. Pour un
+#  dispositif de sauvegarde, c'est la pire issue : on croit avoir restaure.
+# ---------------------------------------------------------------------------
+NB_TABLES=$(docker exec -e PGPASSWORD="$DB_SUPERUSER_PASSWORD" "$CONTAINER" \
+    psql -tAX -U "$DB_SUPERUSER" -d "$DB_NAME" \
+    -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'app';" | tr -d "")
+
+if [[ "${NB_TABLES:-0}" -lt 1 ]]; then
+    fail "La base restauree ne contient AUCUNE table dans app. La sauvegarde
+n'a pas ete restauree. L'ancienne base est intacte sous ${OLD_DB}."
+fi
+if [[ "${RESTAURE_OK:-0}" -ne 1 ]]; then
+    warn "pg_restore a signale des erreurs, mais ${NB_TABLES} tables sont presentes."
+    warn "Verifiez le contenu avant de supprimer ${OLD_DB}."
+fi
+
+info "RESTAURATION TERMINÉE — ${NB_TABLES} tables dans app"
 echo
 echo "  Ancienne base conservée sous : ${BOLD}${OLD_DB}${NC}"
 echo "  Une fois la restauration validée, supprimez-la :"

@@ -17,10 +17,28 @@ set -Eeuo pipefail
 cd "$(dirname "$0")/.."
 [[ -f .env ]] || { echo "[ERREUR] .env introuvable" >&2; exit 1; }
 # shellcheck disable=SC1091
+
+# ---------------------------------------------------------------------------
+#  L'environnement de l'APPELANT prime sur .env.
+#
+#  « set -a; source .env » ecrase les variables deja posees. Sans cette
+#  precaution, BACKUP_DIR passe en
+#  ligne de commande est ignore en
+#  silence, et le script travaille ailleurs que la ou on le croit. Un script
+#  qu'on ne peut pas diriger vers un bac a sable est un script qu'on n'eprouve
+#  jamais — et, ici, une operation qui peut se tromper de cible.
+# ---------------------------------------------------------------------------
+_APPELANT_BACKUP_DIR="${BACKUP_DIR:-}"
 set -a; source .env; set +a
+[[ -n "$_APPELANT_BACKUP_DIR" ]] && BACKUP_DIR="$_APPELANT_BACKUP_DIR"
 
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/gtfc}/minio"
-LOG_FILE="/var/log/gtfc/backup-minio.log"
+# Le journal suit le dossier de sauvegarde s'il est detourne, et se laisse
+# imposer par LOG_FILE. Fige sur /var/log/gtfc, il faisait echouer le script
+# des la premiere ligne sur tout poste qui n'est pas le serveur — « mkdir:
+# cannot create directory '/var': Permission denied » — alors meme que
+# BACKUP_DIR avait ete correctement detourne.
+LOG_FILE="${LOG_FILE:-${BACKUP_DIR%/}/backup-minio.log}"
 mkdir -p "$BACKUP_DIR" "$(dirname "$LOG_FILE")"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
