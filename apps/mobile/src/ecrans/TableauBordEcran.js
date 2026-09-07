@@ -167,6 +167,15 @@ export function TableauBordEcran({ navigation }) {
         />
       ) : null}
 
+      {/* Avant « mes commerces » : la question du matin n'est pas « qui
+          existe ? » mais « chez qui je vais ? ». */}
+      <Bouton
+        titre="Ma feuille de route"
+        icone="map"
+        onPress={() => navigation.navigate('FeuilleRoute')}
+        style={{ marginTop: espacements.s }}
+      />
+
       <Bouton
         titre="Voir mes commerces"
         variante="secondaire"

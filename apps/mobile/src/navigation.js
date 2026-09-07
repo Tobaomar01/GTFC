@@ -26,6 +26,7 @@ import {
   ListeCommercesEcran, FicheCommerceEcran, ScannerEcran,
 } from './ecrans/CommercesEcran';
 import { OutilsEcran } from './ecrans/OutilsEcran';
+import { FeuilleRouteEcran } from './ecrans/FeuilleRouteEcran';
 import { BandeauEtat } from './composants/terrain';
 import { couleurs } from './theme';
 
@@ -111,6 +112,8 @@ export function Navigation() {
               options={{ title: 'Scanner un QR code' }} />
             <Pile.Screen name="FicheCommerce" component={FicheCommerceEcran}
               options={{ title: 'Fiche commerce' }} />
+            <Pile.Screen name="FeuilleRoute" component={FeuilleRouteEcran}
+              options={{ title: 'Ma feuille de route' }} />
           </>
         )}
       </Pile.Navigator>

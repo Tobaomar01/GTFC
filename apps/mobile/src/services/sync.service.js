@@ -334,6 +334,15 @@ async function telechargerPaquet() {
     await sync.enregistrerReferentiels(paquet.referentiels);
   }
 
+  // La feuille du jour se range dans le magasin cle/valeur existant. Pas de
+  // table locale, donc pas de migration du schema SQLite sur les telephones
+  // deja installes.
+  if (paquet.feuille_de_route !== undefined) {
+    await sync.enregistrerReferentiels({
+      feuille_de_route: paquet.feuille_de_route ?? null,
+    });
+  }
+
   const resultat = paquet.commerces?.length
     ? await commerces.fusionnerDepuisServeur(paquet.commerces)
     : { inseres: 0, majs: 0, ignores: 0 };
@@ -353,7 +362,10 @@ export async function chargementInitial(surProgression = () => {}) {
   surProgression({ phase: 'reception', message: 'Téléchargement des données de la commune…' });
   const paquet = await api.paquetHorsLigne(null);
 
-  await sync.enregistrerReferentiels(paquet.referentiels ?? {});
+  await sync.enregistrerReferentiels({
+    ...(paquet.referentiels ?? {}),
+    feuille_de_route: paquet.feuille_de_route ?? null,
+  });
   const resultat = paquet.commerces?.length
     ? await commerces.fusionnerDepuisServeur(paquet.commerces)
     : { inseres: 0, majs: 0 };
