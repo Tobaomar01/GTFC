@@ -548,9 +548,42 @@ async function paquetHorsLigne(contexte, { depuis = null, zoneId = null } = {}) 
        ORDER BY c.modifie_le DESC
        LIMIT 5000`, params);
 
+    // -----------------------------------------------------------------------
+    //  La feuille de route du jour part avec le paquet.
+    //
+    //  Elle est composee si elle ne l'est pas encore : l'agent qui synchronise
+    //  a six heures ne doit pas dependre du passage du planificateur.
+    //
+    //  On n'envoie QUE l'identifiant du commerce, l'ordre et le motif. Les
+    //  fiches completes voyagent deja dans « commerces » : les repeter ici
+    //  doublerait le poids du paquet pour rien, sur une connexion 3G de
+    //  marche couvert.
+    // -----------------------------------------------------------------------
+    let feuille = null;
+    if (contexte.utilisateurId) {
+      const { rows: [f] } = await client.query(
+        `SELECT app.composer_feuille_route($1, current_date) AS id`,
+        [contexte.utilisateurId],
+      ).catch(() => ({ rows: [null] }));
+
+      if (f?.id) {
+        const [entete, lignes] = await Promise.all([
+          client.query(
+            'SELECT id, date_tournee, objectif FROM app.feuille_route WHERE id = $1', [f.id]),
+          client.query(`
+              SELECT commerce_id, ordre, motif
+                FROM app.feuille_route_ligne
+               WHERE feuille_id = $1 AND retiree_le IS NULL
+               ORDER BY ordre`, [f.id]),
+        ]);
+        feuille = { ...entete.rows[0], lignes: lignes.rows };
+      }
+    }
+
     return {
       genere_le: new Date().toISOString(),
       delta_depuis: depuis,
+      feuille_de_route: feuille,
       referentiels: {
         categories: categories.rows,
         zones: zones.rows,
