@@ -96,6 +96,7 @@ declare -A PAR_PARENT=(
   ["app.bareme_tranche"]="SELECT %COLS% FROM app.bareme_tranche WHERE bareme_id IN (SELECT id FROM app.bareme_taxe WHERE commune_id = '%s')"
   ["app.chantier_occupation"]="SELECT %COLS% FROM app.chantier_occupation WHERE chantier_id IN (SELECT id FROM app.chantier WHERE commune_id = '%s')"
   ["app.affectation_agent"]="SELECT %COLS% FROM app.affectation_agent WHERE utilisateur_id IN (SELECT id FROM app.utilisateur WHERE commune_id = '%s')"
+  ["app.feuille_route_ligne"]="SELECT %COLS% FROM app.feuille_route_ligne WHERE feuille_id IN (SELECT id FROM app.feuille_route WHERE commune_id = '%s')"
 )
 
 # ---------------------------------------------------------------------------
