@@ -99,8 +99,8 @@ export async function synchroniser({ surProgression = () => {}, forcer = false }
 /**
  * Résout les dépendances d'une opération avant l'envoi.
  *
- * Cas concret : un agent recense une boutique hors ligne, puis y encaisse
- * 5 000 F dans la foulée. Le paiement a été empilé avec `commerce_id = null`,
+ * Cas concret : un agent recense une boutique hors ligne, puis y note un
+ * passage dans la foulée. La visite a été empilée avec `commerce_id = null`,
  * parce que le serveur n'avait pas encore attribué d'identifiant à la fiche.
  * Au moment de l'envoi, on va le chercher.
  *
@@ -111,7 +111,7 @@ export async function synchroniser({ surProgression = () => {}, forcer = false }
 async function resoudreDependances(operation) {
   const donnees = JSON.parse(operation.donnees);
 
-  const dependantes = ['visite', 'paiement', 'affichage'];
+  const dependantes = ['visite', 'affichage'];
   if (!dependantes.includes(operation.entite)) return donnees;
 
   if (donnees.commerce_id) return donnees;
@@ -142,8 +142,8 @@ async function envoyerOperations(surProgression) {
   let passe = 0;
 
   // Deux passes suffisent : après la première, les commerces créés hors ligne
-  // ont reçu leur identifiant serveur, ce qui débloque leurs paiements et
-  // leurs visites.
+  // ont reçu leur identifiant serveur, ce qui débloque leurs visites et
+  // leurs affichages.
   while (passe < 2) {
     passe += 1;
     let progresse = false;
@@ -266,8 +266,6 @@ async function appliquerResultats(operations, reponse, bilan) {
         await commerces.confirmerModification(op.identifiant_local, resultat.version);
       } else if (op.entite === 'visite') {
         await sync.confirmerVisite(op.identifiant_local);
-      } else if (op.entite === 'paiement') {
-        await sync.confirmerPaiement(op.identifiant_local);
       } else if (op.entite === 'affichage') {
         await objets.confirmerAffichage(op.identifiant_local, {
           id: resultat.entite_id, code: resultat.code,

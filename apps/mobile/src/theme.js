@@ -65,7 +65,6 @@ export const STATUTS_COMMERCE = {
 export const RESULTATS_VISITE = {
   controle: 'Contrôle effectué',
   mise_a_jour: 'Fiche mise à jour',
-  encaissement: 'Encaissement',
   ferme: 'Commerce fermé',
   refus: 'Refus du commerçant',
   introuvable: 'Commerce introuvable',

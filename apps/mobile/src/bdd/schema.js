@@ -142,27 +142,6 @@ CREATE TABLE IF NOT EXISTS visite (
 CREATE INDEX IF NOT EXISTS idx_visite_jour ON visite (debute_le);
 
 -- ---------------------------------------------------------------------------
--- Encaissements en espèces réalisés hors ligne
--- La référence est générée par le téléphone : c'est elle qui garantit qu'un
--- lot rejoué ne crée pas un second paiement pour le même encaissement.
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS paiement (
-  id_local        TEXT PRIMARY KEY,
-  commerce_local  TEXT REFERENCES commerce(id_local) ON DELETE CASCADE,
-  commerce_id     TEXT,
-  avis_id         TEXT,
-  reference       TEXT NOT NULL UNIQUE,
-  montant         INTEGER NOT NULL,
-  moyen           TEXT NOT NULL DEFAULT 'wave',
-  telephone_payeur TEXT,
-  commentaire     TEXT,
-  longitude       REAL,
-  latitude        REAL,
-  paye_le         TEXT NOT NULL,
-  envoye          INTEGER NOT NULL DEFAULT 0
-);
-
--- ---------------------------------------------------------------------------
 -- Photos en attente d'envoi
 --
 -- Le fichier reste dans le stockage de l'application ; seule sa référence est

@@ -207,7 +207,6 @@ export function OutilsEcran({ navigation }) {
         <LigneInfo etiquette="Commerces" valeur={stats.commerces} icone="storefront-outline" />
         <LigneInfo etiquette="À envoyer" valeur={stats.operations_en_attente} icone="cloud-upload-outline" />
         <LigneInfo etiquette="Photos en attente" valeur={stats.photos_en_attente} icone="images-outline" />
-        <LigneInfo etiquette="Encaissements non envoyés" valeur={stats.paiements_en_attente} icone="cash-outline" />
         <LigneInfo etiquette="Dernière synchronisation"
           valeur={formaterDelai(stats.derniere_sync)} icone="time-outline" />
         {espace ? (

@@ -175,14 +175,10 @@ export const oublierPhoto = (idLocal) => executer(
  */
 
 // ---------------------------------------------------------------------------
-// Visites et paiements confirmés
+// Visites confirmées
 // ---------------------------------------------------------------------------
 export const confirmerVisite = (idLocal) => executer(
   'UPDATE visite SET envoyee = 1 WHERE id_local = ?', [idLocal],
-);
-
-export const confirmerPaiement = (idLocal) => executer(
-  'UPDATE paiement SET envoye = 1 WHERE id_local = ?', [idLocal],
 );
 
 // ---------------------------------------------------------------------------

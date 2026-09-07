@@ -16,7 +16,7 @@
  *
  *  D'où `commerce_local` conservé à côté de `commerce_serveur`, et la
  *  résolution faite au moment de l'envoi — une fois le commerce parti et son
- *  identifiant connu. C'est la même mécanique que pour les encaissements
+ *  identifiant connu. C'est la même mécanique que pour les visites
  *  hors ligne.
  * ─────────────────────────────────────────────────────────────────────────
  */

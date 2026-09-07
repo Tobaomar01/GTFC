@@ -63,7 +63,7 @@ export const lireCommerceParQr = (jeton) =>
 /**
  * Identifiant SERVEUR d'un commerce créé localement — null tant qu'il n'a pas
  * été synchronisé. Sert à résoudre les dépendances au moment de l'envoi :
- * un encaissement fait hors ligne sur un commerce lui-même créé hors ligne ne
+ * une visite faite hors ligne sur un commerce lui-même créé hors ligne ne
  * peut partir qu'une fois la fiche remontée.
  */
 export async function idServeurDe(idLocal) {
@@ -332,7 +332,6 @@ export async function confirmerCreation(idLocal, { id, code, version, qr_jeton: 
   // Les éléments rattachés attendaient cet identifiant pour pouvoir partir
   await executer('UPDATE photo_locale SET commerce_id = ? WHERE commerce_local = ?', [id, idLocal]);
   await executer('UPDATE visite SET commerce_id = ? WHERE commerce_local = ?', [id, idLocal]);
-  await executer('UPDATE paiement SET commerce_id = ? WHERE commerce_local = ?', [id, idLocal]);
 }
 
 export const confirmerModification = (idLocal, version) => executer(
@@ -341,7 +340,7 @@ export const confirmerModification = (idLocal, version) => executer(
 );
 
 // ---------------------------------------------------------------------------
-// Visites, paiements
+// Visites
 // ---------------------------------------------------------------------------
 export async function enregistrerVisite(donnees) {
   const idLocal = nouvelId();
@@ -377,51 +376,6 @@ export async function enregistrerVisite(donnees) {
   return idLocal;
 }
 
-/**
- * Encaissement en espèces hors ligne.
- * La référence est construite ici et jamais régénérée : c'est elle qui empêche
- * un double encaissement si le lot est renvoyé après une coupure réseau.
- */
-export async function enregistrerPaiement(donnees) {
-  const idLocal = nouvelId();
-  const ts = maintenant();
-  const reference = donnees.reference
-    ?? `TER-${idLocal.slice(0, 8).toUpperCase()}`;
-
-  await transaction(async (db) => {
-    await db.runAsync(`
-      INSERT INTO paiement (id_local, commerce_local, commerce_id, avis_id, reference,
-                            montant, moyen, telephone_payeur, commentaire,
-                            longitude, latitude, paye_le)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [idLocal, donnees.commerce_local ?? null, donnees.commerce_id ?? null,
-      donnees.avis_id ?? null, reference, Math.round(donnees.montant),
-      donnees.moyen ?? 'wave', donnees.telephone_payeur ?? null,
-      donnees.commentaire ?? null, donnees.longitude ?? null,
-      donnees.latitude ?? null, donnees.paye_le ?? ts]);
-
-    await db.runAsync(`
-      INSERT INTO operation_sync (identifiant_local, entite, operation, donnees,
-                                  horodatage_client, cree_le)
-      VALUES (?, 'paiement', 'creation', ?, ?, ?)`,
-    [idLocal, JSON.stringify({
-      commerce_id: donnees.commerce_id ?? null,
-      commerce_local: donnees.commerce_local ?? null,
-      avis_id: donnees.avis_id ?? null,
-      reference,
-      montant: Math.round(donnees.montant),
-      moyen: donnees.moyen ?? 'wave',
-      telephone_payeur: donnees.telephone_payeur ?? null,
-      commentaire: donnees.commentaire ?? null,
-      longitude: donnees.longitude ?? null,
-      latitude: donnees.latitude ?? null,
-      paye_le: donnees.paye_le ?? ts,
-    }), ts, ts]);
-  });
-
-  return { idLocal, reference };
-}
-
 // ---------------------------------------------------------------------------
 // Statistiques du jour — écran d'accueil
 // ---------------------------------------------------------------------------
@@ -430,17 +384,13 @@ export async function statistiquesDuJour() {
   debutJour.setHours(0, 0, 0, 0);
   const depuis = debutJour.toISOString();
 
-  const [visites, nouveaux, paiements, montant] = await Promise.all([
+  const [visites, nouveaux] = await Promise.all([
     lirePremier('SELECT count(*) AS n FROM visite WHERE debute_le >= ?', [depuis]),
     lirePremier('SELECT count(*) AS n FROM commerce WHERE cree_le >= ? AND origine_locale = 1', [depuis]),
-    lirePremier('SELECT count(*) AS n FROM paiement WHERE paye_le >= ?', [depuis]),
-    lirePremier('SELECT COALESCE(sum(montant), 0) AS total FROM paiement WHERE paye_le >= ?', [depuis]),
   ]);
 
   return {
     visites: visites?.n ?? 0,
     enregistrements: nouveaux?.n ?? 0,
-    paiements: paiements?.n ?? 0,
-    montant_encaisse: montant?.total ?? 0,
   };
 }

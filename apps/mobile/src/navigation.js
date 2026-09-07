@@ -23,7 +23,7 @@ import { RecensementEcran } from './ecrans/RecensementEcran';
 import { AffichageEcran } from './ecrans/AffichageEcran';
 import { ChantierEcran } from './ecrans/ChantierEcran';
 import {
-  ListeCommercesEcran, FicheCommerceEcran, ScannerEcran, EncaissementEcran,
+  ListeCommercesEcran, FicheCommerceEcran, ScannerEcran,
 } from './ecrans/CommercesEcran';
 import { OutilsEcran } from './ecrans/OutilsEcran';
 import { BandeauEtat } from './composants/terrain';
@@ -111,8 +111,6 @@ export function Navigation() {
               options={{ title: 'Scanner un QR code' }} />
             <Pile.Screen name="FicheCommerce" component={FicheCommerceEcran}
               options={{ title: 'Fiche commerce' }} />
-            <Pile.Screen name="Encaissement" component={EncaissementEcran}
-              options={{ title: 'Encaissement' }} />
           </>
         )}
       </Pile.Navigator>

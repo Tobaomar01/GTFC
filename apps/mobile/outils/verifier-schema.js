@@ -71,7 +71,7 @@ async function principal() {
   )[0].values.flat();
 
   const attendues = ['commerce', 'commerce_taxe', 'journal_local', 'meta', 'operation_sync',
-    'paiement', 'photo_locale', 'referentiel', 'visite'];
+    'photo_locale', 'referentiel', 'visite'];
   for (const t of attendues) {
     verifier(`Table ${t}`, tables.includes(t), `tables trouvées : ${tables.join(', ')}`);
   }
@@ -129,17 +129,6 @@ async function principal() {
     INSERT INTO photo_locale (id_local, commerce_local, type, chemin_fichier, prise_le)
     VALUES ('p-1', 'local-1', 'devanture', '/data/photos/x.jpg', ?)`, [maintenant]);
 
-  db.run(`
-    INSERT INTO paiement (id_local, commerce_local, reference, montant, paye_le)
-    VALUES ('pay-1', 'local-1', 'TER-ABCD1234', 15000, ?)`, [maintenant]);
-
-  let referenceDupliquee = false;
-  try {
-    db.run(`INSERT INTO paiement (id_local, commerce_local, reference, montant, paye_le)
-            VALUES ('pay-2', 'local-1', 'TER-ABCD1234', 15000, ?)`, [maintenant]);
-  } catch { referenceDupliquee = true; }
-  verifier('Référence de paiement unique — pas de double encaissement', referenceDupliquee);
-
   // -------------------------------------------------------------------------
   console.log('Requêtes des dépôts');
   // -------------------------------------------------------------------------
@@ -194,13 +183,13 @@ async function principal() {
     verifier('photosEnAttente', false, err.message);
   }
 
-  // statistiquesDuJour
+  // statistiquesDuJour — les recensements du jour
   try {
     const debut = new Date();
     debut.setHours(0, 0, 0, 0);
     const r = db.exec(
-      'SELECT COALESCE(sum(montant), 0) FROM paiement WHERE paye_le >= ?', [debut.toISOString()]);
-    verifier('statistiquesDuJour : somme des encaissements', r[0].values[0][0] === 15000);
+      'SELECT count(*) FROM visite WHERE debute_le >= ?', [debut.toISOString()]);
+    verifier('statistiquesDuJour : visites du jour', typeof r[0].values[0][0] === 'number');
   } catch (err) {
     verifier('statistiquesDuJour', false, err.message);
   }

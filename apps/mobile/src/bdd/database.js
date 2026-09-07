@@ -137,12 +137,11 @@ export async function purgerJournal() {
 // Diagnostic — écran « Paramètres »
 // ---------------------------------------------------------------------------
 export async function statistiquesBase() {
-  const [commerces, enAttente, photos, visites, paiements, conflits] = await Promise.all([
+  const [commerces, enAttente, photos, visites, conflits] = await Promise.all([
     lirePremier('SELECT count(*) AS n FROM commerce'),
     lirePremier("SELECT count(*) AS n FROM operation_sync WHERE statut = 'en_attente'"),
     lirePremier('SELECT count(*) AS n FROM photo_locale WHERE envoyee = 0'),
     lirePremier('SELECT count(*) AS n FROM visite WHERE envoyee = 0'),
-    lirePremier('SELECT count(*) AS n FROM paiement WHERE envoye = 0'),
     lirePremier("SELECT count(*) AS n FROM operation_sync WHERE statut = 'conflit'"),
   ]);
 
@@ -151,7 +150,6 @@ export async function statistiquesBase() {
     operations_en_attente: enAttente?.n ?? 0,
     photos_en_attente: photos?.n ?? 0,
     visites_en_attente: visites?.n ?? 0,
-    paiements_en_attente: paiements?.n ?? 0,
     conflits: conflits?.n ?? 0,
     derniere_sync: await lireMeta('derniere_sync'),
   };
@@ -183,7 +181,6 @@ export async function reinitialiser({ forcer = false } = {}) {
   await db.execAsync(`
     DELETE FROM operation_sync;
     DELETE FROM photo_locale;
-    DELETE FROM paiement;
     DELETE FROM visite;
     DELETE FROM commerce_taxe;
     DELETE FROM commerce;

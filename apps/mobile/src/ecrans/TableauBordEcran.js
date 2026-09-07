@@ -27,7 +27,7 @@ export function TableauBordEcran({ navigation }) {
   } = useApp();
 
   const [stats, setStats] = useState({
-    visites: 0, enregistrements: 0, paiements: 0, montant_encaisse: 0,
+    visites: 0, enregistrements: 0,
   });
   const [rafraichit, setRafraichit] = useState(false);
   const [syncEnCours, setSyncEnCours] = useState(false);
@@ -148,20 +148,7 @@ export function TableauBordEcran({ navigation }) {
       <View style={styles.grilleStats}>
         <Statistique valeur={stats.enregistrements} libelle="Recensements" icone="storefront" />
         <Statistique valeur={stats.visites} libelle="Visites" icone="walk" />
-        <Statistique valeur={stats.paiements} libelle="Encaissements" icone="cash" />
       </View>
-
-      {stats.montant_encaisse > 0 ? (
-        <Carte style={{ backgroundColor: couleurs.primaire }}>
-          <Text style={{ color: '#CFE3D6', fontSize: 14 }}>Encaissé aujourd'hui</Text>
-          <Text style={{ color: '#FFF', fontSize: 28, fontWeight: '700' }}>
-            {formaterXof(stats.montant_encaisse)}
-          </Text>
-          <Text style={{ color: '#CFE3D6', fontSize: 13, marginTop: espacements.xs }}>
-            À remettre en caisse à la mairie en fin de tournée
-          </Text>
-        </Carte>
-      ) : null}
 
       {/* --- Synchronisation */}
       <Text style={[typographie.sousTitre, {

@@ -17,7 +17,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useApp } from '../contextes/AppContexte';
 import {
   listerCommerces, lireCommerce, lireCommerceParQr, lireTaxesCommerce,
-  enregistrerVisite, enregistrerPaiement,
+  enregistrerVisite,
 } from '../bdd/commerces.repo';
 import { photosDuCommerce, lireReferentiel } from '../bdd/sync.repo';
 import { api } from '../api/client';
@@ -401,14 +401,6 @@ export function FicheCommerceEcran({ route, navigation }) {
             </TouchableOpacity>
           ))}
         </View>
-
-        <Bouton
-          titre="Encaisser en espèces"
-          icone="cash-outline"
-          variante="secondaire"
-          onPress={() => navigation.navigate('Encaissement', { idLocal })}
-          style={{ marginTop: espacements.m }}
-        />
       </Carte>
     </ScrollView>
   );
@@ -492,112 +484,6 @@ export function ScannerEcran({ navigation }) {
         </Text>
       </View>
     </View>
-  );
-}
-
-// ===========================================================================
-//  Encaissement
-// ===========================================================================
-export function EncaissementEcran({ route, navigation }) {
-  const { idLocal } = route.params;
-  const [commerce, setCommerce] = useState(null);
-  const [montant, setMontant] = useState('');
-  const [commentaire, setCommentaire] = useState('');
-  const [charge, setCharge] = useState(false);
-
-  useEffect(() => { lireCommerce(idLocal).then(setCommerce); }, [idLocal]);
-
-  const encaisser = async () => {
-    const valeur = Number(montant);
-    if (!(valeur > 0)) { Alert.alert('Montant invalide', 'Saisissez un montant supérieur à zéro.'); return; }
-
-    Alert.alert(
-      'Confirmer l\'encaissement',
-      `${formaterXof(valeur)} reçus de ${commerce.enseigne}.\n\n`
-      + 'Une fois enregistré, ce montant vous sera réclamé en caisse. Confirmez uniquement si vous avez bien reçu l\'argent.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Confirmer',
-          onPress: async () => {
-            setCharge(true);
-            try {
-              let position = null;
-              try { position = await releverPosition({ delaiMaxMs: 8000 }); } catch { /* facultatif */ }
-
-              const { reference } = await enregistrerPaiement({
-                commerce_local: idLocal,
-                commerce_id: commerce.id_serveur,
-                montant: valeur,
-                moyen: 'wave',
-                telephone_payeur: commerce.telephone_paiement,
-                commentaire: commentaire || null,
-                longitude: position?.longitude,
-                latitude: position?.latitude,
-              });
-
-              await enregistrerVisite({
-                commerce_local: idLocal,
-                commerce_id: commerce.id_serveur,
-                resultat: 'encaissement',
-                longitude: position?.longitude,
-                latitude: position?.latitude,
-              });
-
-              Alert.alert(
-                'Encaissement enregistré',
-                `Référence : ${reference}\n\nCommuniquez-la au commerçant. `
-                + 'La quittance officielle sera émise par la mairie après synchronisation.',
-                [{ text: 'Terminé', onPress: () => navigation.goBack() }],
-              );
-            } catch (err) {
-              Alert.alert('Enregistrement impossible', err.message);
-            } finally {
-              setCharge(false);
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  if (!commerce) return <Chargement />;
-
-  return (
-    <ScrollView style={{ flex: 1, backgroundColor: couleurs.fond }}
-      contentContainerStyle={{ padding: espacements.l }}
-    >
-      <Carte>
-        <Text style={typographie.sousTitre}>{commerce.enseigne}</Text>
-        <Text style={typographie.petit}>{commerce.code ?? 'non synchronisé'}</Text>
-        {commerce.solde_du > 0 ? (
-          <Text style={[typographie.titre, { color: couleurs.impaye, marginTop: espacements.s }]}>
-            {formaterXof(commerce.solde_du)} dus
-          </Text>
-        ) : null}
-      </Carte>
-
-      <Message
-        type="avertissement"
-        titre="Encaissement en espèces"
-        texte="Privilégiez le paiement Wave quand c'est possible : il est tracé de bout en bout et vous évite de transporter de l'argent. Tout encaissement en espèces est nominatif et devra être versé en caisse."
-      />
-
-      <Champ
-        etiquette="Montant reçu"
-        valeur={montant}
-        onChangeText={(t) => setMontant(t.replace(/[^0-9]/g, ''))}
-        keyboardType="number-pad"
-        suffixe="FCFA"
-        obligatoire
-        placeholder="0"
-      />
-
-      <Champ etiquette="Observation" valeur={commentaire} onChangeText={setCommentaire}
-        multiline numberOfLines={2} />
-
-      <Bouton titre="Enregistrer l'encaissement" icone="cash" onPress={encaisser} charge={charge} />
-    </ScrollView>
   );
 }
 
