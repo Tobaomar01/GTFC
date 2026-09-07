@@ -23,6 +23,22 @@ cd "$(dirname "$0")/.."
 ROOT_DIR="$(pwd)"
 
 [[ -f .env ]] || fail ".env introuvable"
+
+# ---------------------------------------------------------------------------
+#  .env est CHARGE, pas seulement constate.
+#
+#  Le script se contentait de verifier que le fichier existe. Les variables
+#  restaient donc vides au moment ou le bloc cron est ecrit, et la ligne du
+#  VACUUM mensuel partait avec ses valeurs par defaut :
+#
+#      docker exec gtfc-postgres psql -U postgres -d gtfc_taxes -c 'VACUUM ANALYZE;'
+#
+#  « gtfc_taxes » n'existe pas — la base s'appelle autrement. L'entretien
+#  mensuel echouait donc chaque mois, en silence, dans cron.log : un fichier
+#  que personne ne lit tant que rien ne va mal.
+# ---------------------------------------------------------------------------
+# shellcheck disable=SC1091
+set -a; source .env; set +a
 [[ -d /var/log/gtfc ]] || sudo mkdir -p /var/log/gtfc
 
 MARKER_START="# >>> GTFC — tâches planifiées (généré, ne pas éditer à la main) >>>"
@@ -47,7 +63,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 0 7 * * *   cd ${ROOT_DIR} && bash scripts/healthcheck.sh >> /var/log/gtfc/healthcheck.log 2>&1
 
 # Entretien mensuel de la base
-0 2 1 * *   docker exec gtfc-postgres psql -U ${DB_SUPERUSER:-postgres} -d ${DB_NAME:-gtfc_taxes} -c 'VACUUM ANALYZE;' >> /var/log/gtfc/cron.log 2>&1
+0 2 1 * *   docker exec ${PG_CONTENEUR:-gtfc-postgres} psql -U ${DB_SUPERUSER:-postgres} -d ${DB_NAME:?DB_NAME absent de .env} -c 'VACUUM ANALYZE;' >> /var/log/gtfc/cron.log 2>&1
 ${MARKER_END}
 CRON
 )

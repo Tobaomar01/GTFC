@@ -170,11 +170,29 @@ if [[ "${1:-}" == "--verify" ]]; then
             psql -tAX -U "$DB_SUPERUSER" -d "$TEST_DB" \
             -c "SELECT count(*) FROM information_schema.tables WHERE table_schema IN ('app','ref','audit');")
         log "Test de restauration RÉUSSI — ${NB} tables restaurées"
+        VERIFY_OK=1
     else
-        log "AVERTISSEMENT : le test de restauration a signalé des erreurs (voir le log)"
+        log "ECHEC : le test de restauration a signale des erreurs (voir le log)"
+        VERIFY_OK=0
     fi
     docker exec -e PGPASSWORD="$DB_SUPERUSER_PASSWORD" "$CONTAINER" \
         dropdb -U "$DB_SUPERUSER" --if-exists "$TEST_DB"
+
+    # -----------------------------------------------------------------------
+    #  Un test de restauration en echec fait ECHOUER la sauvegarde.
+    #
+    #  Il se contentait d'un avertissement dans le journal, et le script sortait
+    #  avec le code 0. Cette tache tourne le dimanche par cron : sa sortie part
+    #  dans /var/log/gtfc/cron.log, que personne ne lit tant que rien ne va mal.
+    #  Une sauvegarde irrestaurable aurait donc ete comptee comme reussie,
+    #  semaine apres semaine.
+    #
+    #  « Une sauvegarde jamais restauree n'est pas une sauvegarde » — et une
+    #  sauvegarde dont la restauration echoue n'en est pas une non plus.
+    # -----------------------------------------------------------------------
+    if [[ "${VERIFY_OK:-0}" -ne 1 ]]; then
+        fail "La sauvegarde a ete produite mais NE SE RESTAURE PAS : ${TARGET}"
+    fi
 fi
 
 # --- 9. Récapitulatif -------------------------------------------------------
