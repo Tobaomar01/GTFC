@@ -29,10 +29,33 @@ cd "$(dirname "$0")/.."
 ROOT_DIR="$(pwd)"
 
 [[ -f .env ]] || fail ".env introuvable. Voir docs/PHASE-1-serveur.md, étape 5."
+
+# ---------------------------------------------------------------------------
+#  On retient la base demandee par l'APPELANT avant de lire .env.
+#
+#  « set -a; source .env » ecrase les variables deja posees dans
+#  l'environnement. Sans cette precaution, « DB_NAME=gtfc_essai bash
+#  db/migrate.sh » migre en silence la base nommee dans .env — sur un serveur,
+#  la base de PRODUCTION — alors que l'operateur croit viser un bac a sable.
+#
+#  Le meme piege existe dans scripts/backup-minio.sh avec BACKUP_DIR. Ici il
+#  est dangereux : on ne se trompe pas de base impunement.
+# ---------------------------------------------------------------------------
+_DB_NAME_APPELANT="${DB_NAME:-}"
+
 # shellcheck disable=SC1091
 set -a; source .env; set +a
 
-CONTAINER="gtfc-postgres"
+if [[ -n "$_DB_NAME_APPELANT" && "$_DB_NAME_APPELANT" != "${DB_NAME:-}" ]]; then
+    DB_NAME="$_DB_NAME_APPELANT"
+    warn "Base imposee par l'environnement : ${DB_NAME} (et non celle de .env)"
+fi
+
+# Le nom du conteneur vient de docker-compose.yml, mais il doit rester
+# surchargeable : sur un poste de developpement il differe souvent, et un
+# script qu'on ne peut jouer que sur le serveur est un script qu'on n'eprouve
+# jamais. Meme forme que scripts/backup-postgres.sh.
+CONTAINER="${PG_CONTENEUR:-gtfc-postgres}"
 MIG_DIR="${ROOT_DIR}/db/migrations"
 SEED_DIR="${ROOT_DIR}/db/seeds"
 

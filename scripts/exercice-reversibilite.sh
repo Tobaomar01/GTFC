@@ -41,7 +41,7 @@ GARDER=0
 # shellcheck disable=SC1091
 set -a; source .env; set +a
 
-CONTENEUR="${PG_CONTENEUR:-gtfc-pg17}"
+CONTENEUR="${PG_CONTENEUR:-gtfc-postgres}"
 BASE="${DB_NAME:-gtfc_recette}"
 TEMOIN="${BASE}_reversibilite"
 # Le dossier de travail vit dans le depot, pas dans /tmp : sous Windows,

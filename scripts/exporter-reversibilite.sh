@@ -52,7 +52,10 @@ done
 # shellcheck disable=SC1091
 set -a; source .env; set +a
 
-CONTENEUR="${PG_CONTENEUR:-gtfc-pg17}"
+# Defaut : le nom de docker-compose.yml, donc celui de la production.
+# La premiere version portait « gtfc-pg17 », le nom de la machine de recette :
+# l'export aurait echoue sur le serveur, la ou il sert.
+CONTENEUR="${PG_CONTENEUR:-gtfc-postgres}"
 BASE="${DB_NAME:-gtfc_recette}"
 
 # ---------------------------------------------------------------------------
