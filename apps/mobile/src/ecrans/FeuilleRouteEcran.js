@@ -57,6 +57,14 @@ const MOTIFS = {
     icone: 'pie-chart-outline',
     couleur: '#6B4E00',
   },
+  suivi_recensement: {
+    titre: 'Visite de suivi',
+    aide: 'Recensé il y a quelques semaines, avant son premier avis. Vérifier '
+      + 'que le gérant a compris comment ça marche, pendant que la '
+      + 'conversation est encore neutre.',
+    icone: 'checkmark-circle-outline',
+    couleur: couleurs.primaire,
+  },
   echeance_depassee: {
     titre: 'Échéance dépassée',
     aide: 'Relance.',

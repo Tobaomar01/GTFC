@@ -48,6 +48,7 @@ const LIBELLE_MOTIF = {
   jamais_paye: 'N\'a jamais rien réglé — expliquer le dispositif',
   paiement_interrompu: 'A réglé, puis s\'est arrêté — comprendre pourquoi',
   paiement_partiel: 'Règle une part seulement — expliquer le montant dû',
+  suivi_recensement: 'Visite de suivi — vérifier que le dispositif est compris',
   echeance_depassee: 'Échéance dépassée — relance',
   ajout_superviseur: 'Ajouté par le superviseur',
 };

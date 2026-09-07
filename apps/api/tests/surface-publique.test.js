@@ -46,11 +46,23 @@ test.after(async () => {
 });
 
 test('la vue publique d\'un sticker ne livre ni montant ni identité', async () => {
+  // Un commerce STABLE, et designe de facon deterministe.
+  //
+  // Les fiches « ZZ-TEST-% » sont creees puis archivees par les autres
+  // fichiers de test, qui tournent EN PARALLELE. Depuis que l'archivage
+  // desactive aussi le QR (trg_qr_suit_archivage), le vivier des QR actifs
+  // retrecit pendant que ce test tourne : le jeton choisi pouvait etre
+  // desactive entre le SELECT et l'appel HTTP, et la route repondait 404.
+  //
+  // ORDER BY parce qu'un LIMIT sans tri ne designe rien de stable — meme
+  // defaut que celui corrige au commit 2ca1713.
   const qr = await un(`
     SELECT q.jeton, c.enseigne, c.gerant_nom, c.gerant_telephone, c.solde_du
       FROM app.qr_code q
       JOIN app.commerce c ON c.id = q.commerce_id
      WHERE q.actif AND c.archive_le IS NULL AND c.gerant_nom IS NOT NULL
+       AND c.enseigne NOT LIKE 'ZZ-TEST-%'
+     ORDER BY c.code
      LIMIT 1`);
   assert.ok(qr, 'il faut un QR actif pour éprouver la vue publique');
 
