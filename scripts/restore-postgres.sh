@@ -169,7 +169,15 @@ docker exec -e PGPASSWORD="$DB_SUPERUSER_PASSWORD" "$CONTAINER" \
     || { RESTAURE_OK=0; warn "pg_restore a signale des erreurs — voir ci-dessus."; }
 
 # Les droits du rôle applicatif ne sont pas dans le dump (--no-privileges)
-docker exec -e PGPASSWORD="$DB_SUPERUSER_PASSWORD" "$CONTAINER" \
+# « docker exec » SANS -i ne transmet PAS l'entree standard au conteneur.
+# Le heredoc partait donc dans le vide : psql ne recevait rien, ne faisait
+# rien, et sortait en 0. Le script annoncait « Droits reappliques » alors
+# qu'AUCUN droit n'avait ete donne. Apres restauration, gtfc_app n'avait
+# meme plus USAGE sur le schema app, et toute connexion echouait sur
+#     permission denied for schema app
+# La commune restaurait sa sauvegarde apres un incident, lisait
+# « RESTAURATION TERMINEE », et la plateforme restait morte.
+docker exec -i -e PGPASSWORD="$DB_SUPERUSER_PASSWORD" "$CONTAINER" \
     psql -v ON_ERROR_STOP=1 -U "$DB_SUPERUSER" -d "$DB_NAME" <<SQL >/dev/null
     GRANT USAGE ON SCHEMA app, ref, audit, public TO ${DB_USER};
     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES    IN SCHEMA app, ref TO ${DB_USER};
@@ -177,7 +185,15 @@ docker exec -e PGPASSWORD="$DB_SUPERUSER_PASSWORD" "$CONTAINER" \
     GRANT SELECT, INSERT                 ON ALL TABLES    IN SCHEMA audit  TO ${DB_USER};
     GRANT USAGE, SELECT                  ON ALL SEQUENCES IN SCHEMA audit  TO ${DB_USER};
 SQL
-info "Droits du rôle ${DB_USER} réappliqués"
+# ON VERIFIE, ON N'ANNONCE PAS. Cette ligne se contentait de dire que les
+# droits etaient reappliques, sans jamais le constater — c'est ainsi qu'un
+# heredoc parti dans le vide a pu passer pour un succes. Un message n'est pas
+# un controle.
+DROITS_OK=$(docker exec -e PGPASSWORD="$DB_SUPERUSER_PASSWORD" "$CONTAINER" psql -tAX -U "$DB_SUPERUSER" -d "$DB_NAME" -c "SELECT has_schema_privilege('${DB_USER}','app','USAGE') AND has_table_privilege('${DB_USER}','app.utilisateur','SELECT');" | tr -d "[:space:]")
+if [[ "$DROITS_OK" != "t" ]]; then
+    fail "Les droits de ${DB_USER} n'ont PAS ete appliques : la base est restauree mais l'application ne pourra pas la lire."
+fi
+info "Droits du rôle ${DB_USER} réappliqués et vérifiés"
 
 # --- Contrôle ---------------------------------------------------------------
 step "5/5  Contrôle"
