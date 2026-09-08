@@ -98,3 +98,19 @@ apps/mobile/.export-verif/
 # Ils reapparaissent tout seuls et n'ont pas a suivre le depot.
 apps/dashboard/AGENTS.md
 apps/dashboard/CLAUDE.md
+
+# ---------------------------------------------------------------------------
+#  Ce qui appartient au depot de la specification
+#
+#  github.com/Tobaomar01/specification-revenu-municipal les versionne deja, et
+#  les copies presentes ici en sont IDENTIQUES (verifie le 08/09/2026). Les
+#  suivre aux deux endroits ferait deux verites qui divergeraient : c'est
+#  exactement ce qui est arrive a specs/, ou la copie locale du pilote avait
+#  pris 53 lignes de retard sans que rien ne le dise.
+#
+#  Avant d'editer l'un de ces fichiers : cloner ce depot-la et y travailler.
+# ---------------------------------------------------------------------------
+/specs/
+/.specify/
+/.claude/
+/REPRISE-specification.md

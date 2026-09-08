@@ -90,13 +90,16 @@ cd apps/api && DB_NAME=gtfc_recette node src/scheduler.js --une-fois
 bash scripts/exercice-restauration-minio.sh
 
 # Les défauts qu'aucun test ne voit — la sortie doit être VIDE
-npx eslint@9 --config eslint.defauts.mjs \
-  apps/api/src apps/api/scripts apps/api/tests \
-  apps/dashboard/src apps/mobile/src apps/mobile/outils
+#
+# « npx eslint@9 » ne suffisait pas : eslint.defauts.mjs importe « globals »,
+# que rien ne déclarait. Sur un clone neuf la commande s'arrêtait sur
+# ERR_MODULE_NOT_FOUND — un contrôle qu'un nouveau venu ne pouvait pas jouer.
+npm ci        # une seule fois, à la racine
+npm run defauts
 ```
 
 Plus, avec un navigateur : `cd apps/dashboard && npm test` (19 tests, dont un
-ignoré faute de `QR_JETON` — le fournir le fait passer à 18).
+ignoré faute de `QR_JETON` — le fournir les fait passer tous les 19).
 
 Deux d’entre eux demandent un code au portail, qui plafonne les demandes par
 numéro et par heure : rejouer la suite plusieurs fois d’affilée en ignore un,

@@ -1,0 +1,13 @@
+{
+  "name": "gtfc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Racine du dépôt : uniquement l'outillage de contrôle. Les trois applications ont leurs propres paquets sous apps/. Pas de « workspaces » : chacune s'installe et se lance seule, comme sur le serveur de la commune.",
+  "scripts": {
+    "defauts": "eslint --config eslint.defauts.mjs apps/api/src apps/api/scripts apps/api/tests apps/dashboard/src apps/mobile/src apps/mobile/outils outils"
+  },
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "globals": "17.11.0"
+  }
+}
