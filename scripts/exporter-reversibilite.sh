@@ -89,6 +89,7 @@ declare -A EXCLUES=(
   ["app.session"]="jetons d'authentification en cours — les exporter serait une faille, et ils ne valent plus rien après la sortie"
   ["app.session_redevable"]="idem, sessions du portail des redevables"
   ["app.tache_planifiee"]="journal interne du planificateur, sans valeur pour la commune"
+  ["app.schema_migration"]="registre des migrations appliquées — état de l'outil, pas donnée de la commune ; il ne veut rien dire sans le code qui va avec, et le schéma part déjà dans schema.sql"
 )
 
 # ---------------------------------------------------------------------------
@@ -262,7 +263,16 @@ if [[ $AVEC_OBJETS -eq 1 ]] && docker inspect -f '{{.State.Running}}' gtfc-minio
     # rend la forme que le moteur comprend ; ailleurs, « pwd » suffit. Sans
     # cela le montage echoue en silence et le miroir ecrit dans le conteneur,
     # qui disparait aussitot : zero fichier, et aucune erreur.
-    ABSOLU="$( { cd "${SORTIE}/objets" && pwd -W; } 2>/dev/null || { cd "${SORTIE}/objets" && pwd; } )"
+    # UN SEUL « cd ». La forme precedente en faisait deux : la premiere branche
+    # changeait de dossier PUIS echouait sur « pwd -W », qui n'existe pas hors
+    # de Git Bash ; le repli refaisait alors le meme cd RELATIF depuis le dossier
+    # ou il venait d'arriver. Sur un serveur Linux, avec un SORTIE relatif :
+    #     cd: ./reversibilite-gtfc-20260908-172742/objets: No such file or directory
+    # ABSOLU restait vide, et l'export de reversibilite — la garantie que la
+    # commune peut partir avec ses donnees — s'arretait la, sans manifeste ni
+    # archive. Il ne marchait que sous Windows, ou « pwd -W » reussit du premier
+    # coup et le second cd n'a jamais lieu.
+    ABSOLU="$(cd "${SORTIE}/objets" && { pwd -W 2>/dev/null || pwd; })"
 
     ATTENDUS=0
     for B in "${MINIO_BUCKET_PHOTOS}" "${MINIO_BUCKET_DOCUMENTS}" "${MINIO_BUCKET_QRCODES}"; do

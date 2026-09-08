@@ -46,12 +46,18 @@ BASE="${DB_NAME:-gtfc_recette}"
 TEMOIN="${BASE}_reversibilite"
 # Le dossier de travail vit dans le depot, pas dans /tmp : sous Windows,
 # Docker interprete « /tmp » comme « C:	mp », qui n'existe pas. Le chemin
-# doit lui etre donne sous la forme qu'il comprend — d'ou chemin_hote().
+# de travail reste donc sous le depot, la ou Docker sait le monter.
 TRAVAIL="$(pwd)/.exercice-reversibilite-$"
 
 # Docker sous Windows ne connait pas les chemins MSYS (/c/Users/...).
 # « pwd -W » rend la forme attendue ; ailleurs « pwd » suffit.
-chemin_hote() { { cd "$1" && pwd -W; } 2>/dev/null || { cd "$1" && pwd; }; }
+# UN SEUL « cd », dans un SOUS-SHELL. La forme precedente en faisait deux : la
+# premiere branche changeait de dossier PUIS echouait sur « pwd -W », et le
+# repli refaisait le meme cd depuis le dossier ou il venait d'arriver — donc
+# une erreur des que l'argument est relatif. Et « { } » n'etant pas un
+# sous-shell, ce cd fuyait dans le shell appelant : la suite du script
+# aurait travaille ailleurs sans que rien ne le dise.
+chemin_hote() { ( cd "$1" && { pwd -W 2>/dev/null || pwd; } ); }
 
 docker inspect -f '{{.State.Running}}' "$CONTENEUR" 2>/dev/null | grep -q true \
     || { echo "Le conteneur ${CONTENEUR} n'est pas démarré." >&2; exit 1; }
