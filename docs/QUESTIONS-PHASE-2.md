@@ -61,15 +61,12 @@ chacune des 5 taxes** :
 
 Toutes ces valeurs sont **inventées** et marquées `À_REMPLACER` en base.
 
-⚠️ **Attention, et c'est important :** la constitution du projet exige qu'« aucun avis
-NE SOIT émis tant que le barème qui le fonde est provisoire ». **Cette règle n'est pas
-appliquée par le code.** Les données provisoires ne déclenchent qu'un avertissement, et
-chaque ligne d'avis est simplement *marquée* provisoire. La preuve : le jeu de
-démonstration porte 61 avis émis sur ces barèmes inventés.
+**Tant que ce tableau n'est pas rempli, le système REFUSE d'émettre le moindre avis.**
+La base le vérifie elle-même, à chaque émission : un avis émis est une créance notifiée
+à une personne, et elle ne peut pas se fonder sur un montant que le conseil municipal
+n'a pas délibéré. Le message est explicite et nomme les taxes en cause.
 
-Autrement dit, rien n'empêche aujourd'hui d'émettre de vrais avis sur de faux montants.
-Le défaut est signalé ; tant qu'il n'est pas corrigé, la prudence ne tient qu'à
-l'exploitant.
+C'est donc bien ce tableau qui débloque la facturation, et rien d'autre.
 
 | Taxe | Mode de calcul attendu | Tranches à fournir | Fourchette actuelle (inventée) |
 |---|---|---|---|

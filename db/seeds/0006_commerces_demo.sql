@@ -210,9 +210,30 @@ v_periode_id := app.creer_periode_mensuelle(
 
 PERFORM app.generer_avis_periode(v_periode_id, NULL);
 
+-- ---------------------------------------------------------------------------
+--  EXCEPTION ASSUMEE, ET C'EST POURQUOI ELLE EST ECRITE ICI.
+--
+--  0077 interdit d'emettre un avis fonde sur un bareme provisoire : un avis
+--  emis est une creance notifiee, et les baremes de ce jeu sont INVENTES.
+--  La regle est juste, et elle vise exactement ces soixante avis.
+--
+--  Mais un jeu de demonstration sans avis emis ne montre plus rien : ni
+--  tableau de bord, ni recouvrement, ni carte en trois couleurs. On leve donc
+--  le declencheur, NOMMEMENT, le temps de cette insertion — et on le remet.
+--
+--  Une exception qu'on lit dans le fichier vaut infiniment mieux qu'un trou
+--  qu'on ne voit pas : elle se cherche, elle se compte, et elle ne s'etend pas
+--  toute seule. app.v_avis_sur_bareme_provisoire les nomme ensuite un par un.
+-- ---------------------------------------------------------------------------
+ALTER TABLE app.avis_imposition DISABLE TRIGGER trg_refuser_avis_provisoire;
+ALTER TABLE app.avis_imposition DISABLE TRIGGER trg_refuser_avis_provisoire_insert;
+
 UPDATE app.avis_imposition
    SET statut = 'emis', date_emission = current_date
  WHERE periode_id = v_periode_id AND statut = 'brouillon' AND montant_total > 0;
+
+ALTER TABLE app.avis_imposition ENABLE TRIGGER trg_refuser_avis_provisoire;
+ALTER TABLE app.avis_imposition ENABLE TRIGGER trg_refuser_avis_provisoire_insert;
 
 -- ---------------------------------------------------------------------------
 -- 6. Paiements simulés — pour que la carte affiche les trois couleurs
