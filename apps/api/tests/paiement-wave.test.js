@@ -25,7 +25,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
-const { q, un, fermer } = require('./aide');
+const { q, un, enTransaction, fermer } = require('./aide');
 
 const config = require('../src/config/env');
 const app = require('../src/app');
@@ -244,3 +244,55 @@ test('une session inconnue est acceptée sans rien encaisser', async () => {
     [`WAVE-${`sess-fantome-${SERIE}`.slice(-16).toUpperCase()}`]);
   assert.equal(p, undefined, 'une session inconnue ne doit rien encaisser');
 });
+
+// ===========================================================================
+//  Le rapprochement : savoir reconnaître un désaccord avec l'opérateur
+//
+//  La constitution l'exige : « En cas de désaccord entre le système et
+//  l'opérateur de mobile money, l'encaissement DOIT être bloqué et présenté
+//  comme en attente. Il NE DOIT jamais être présumé. »
+//
+//  Encore faut-il SAVOIR reconnaître un désaccord. Rien ne comparait
+//  app.transaction_wave à app.paiement. Un webhook perdu — et tout opérateur
+//  en perd — laissait un redevable qui a payé et qui doit toujours. Un agent
+//  serait allé lui réclamer une somme déjà réglée, le reçu sur son téléphone.
+//  C'est la pire visite possible, et elle était invisible côté mairie.
+// ===========================================================================
+
+test('un encaissement Wave sans paiement imputé est signalé', async () => {
+  await enTransaction(async (client) => {
+    const { rows: [avis] } = await client.query(
+      'SELECT id, commune_id FROM app.avis_imposition LIMIT 1');
+    assert.ok(avis, 'aucun avis : le jeu de données est vide');
+
+    await client.query(`
+      INSERT INTO app.transaction_wave (commune_id, avis_id, wave_session_id, montant,
+                                        devise, telephone, statut, environnement,
+                                        expire_le, confirme_le)
+      VALUES ($1, $2, 'cos_test_rapprochement', 5000, 'XOF', '+221700000000',
+              'reussie', 'sandbox', now() + interval '1 day', now())`,
+    [avis.commune_id, avis.id]);
+
+    const { rows } = await client.query(`
+      SELECT gravite FROM app.v_rapprochement_wave
+       WHERE wave_session_id = 'cos_test_rapprochement'`);
+    assert.equal(rows.length, 1,
+      'un encaissement confirmé par Wave sans paiement imputé passe inaperçu');
+    assert.equal(rows[0].gravite, 'erreur',
+      'ce désaccord n\'est qu\'un avertissement : personne ne le regardera');
+
+    const { rows: coherence } = await client.query(
+      "SELECT nb FROM app.verifier_coherence($1) WHERE controle LIKE '%encaisse_non_impute%'",
+      [avis.commune_id]);
+    assert.equal(Number(coherence[0]?.nb), 1,
+      'le contrôle de cohérence quotidien ne remonte pas le désaccord');
+  });
+});
+
+// Pas de test « le rapprochement est vide » : il affirmerait un invariant GLOBAL
+// alors que les tests voisins de ce fichier creent legitimement des transactions
+// Wave en cours de route. Il ne saurait pas distinguer un vrai desaccord d'un
+// residu d'essai — et un test qui echoue pour la mauvaise raison finit ignore.
+//
+// Ce controle-la est OPERATIONNEL, pas unitaire : app.verifier_coherence() le
+// porte, et la tache quotidienne de 6h30 le regarde sur les donnees reelles.
