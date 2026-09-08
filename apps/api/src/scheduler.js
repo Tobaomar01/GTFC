@@ -451,7 +451,7 @@ const composerFeuilles = tache('feuilles-de-route', async () => {
 // 14. Mémoire mensuelle des situations — le 1er du mois, 04h00
 //
 // Fige, pour chaque commerce facturé, sa situation à la fin du mois écoulé
-// (FR-086). C'est le seul fondement autorisé de l'indicateur de risque : un
+// (FR-082). C'est le seul fondement autorisé de l'indicateur de risque : un
 // classement calculé sur l'état courant changerait tout seul dès qu'un avis
 // est annulé ou un versement repris.
 //

@@ -56,7 +56,7 @@ const PAGES = [
   { chemin: '/agents', porte: /agent/i },
   { chemin: '/audit', porte: /audit|action|journal/i },
   { chemin: '/derogations', porte: /dérogation|exonération|montant/i },
-  // Réservée à la mairie (FR-092). Le repère accepte l'état vide : tant que
+  // Réservée à la mairie (FR-088). Le repère accepte l'état vide : tant que
   // la mémoire est mince, tout est « indéterminé » — et c'est une réponse.
   { chemin: '/accompagnement', porte: /accompagnement|indétermin|commerce/i },
 ];

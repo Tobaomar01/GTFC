@@ -135,7 +135,7 @@ router.get('/stats/coherence', exigerRole('superviseur'), asyncHandler(async (re
 }));
 
 /**
- * Risque de défaut de paiement — FR-089 à FR-092.
+ * Risque de défaut de paiement — FR-086 à FR-088.
  *
  * RÉSERVÉ À LA MAIRIE. Cette route n'est pas relayée vers l'application de
  * terrain : un agent qui lirait « risque élevé » avant d'entrer ne parlerait
@@ -143,7 +143,7 @@ router.get('/stats/coherence', exigerRole('superviseur'), asyncHandler(async (re
  * MOTIF en clair sur sa feuille de route — « paiement interrompu » — qui dit
  * quoi faire sans porter de jugement.
  *
- * Le niveau ne part JAMAIS sans ses facteurs : FR-089 l'interdit, et un
+ * Le niveau ne part JAMAIS sans ses facteurs : FR-086 l'interdit, et un
  * classement qu'on ne peut pas expliquer au commerçant qu'il désigne n'a rien
  * à faire dans une administration.
  */

@@ -178,7 +178,7 @@ test('une correction remplace l\'observation, elle ne la réécrit pas', async (
 //  L'indicateur
 // ===========================================================================
 
-test('sous le nombre de mois minimal, aucun niveau n\'est prononcé (FR-091)', async () => {
+test('sous le nombre de mois minimal, aucun niveau n\'est prononcé (FR-087)', async () => {
   const trop_tot = await q(`
     SELECT commerce_id, nb_mois, mois_minimaux, niveau
       FROM app.v_risque_defaut
@@ -189,7 +189,7 @@ test('sous le nombre de mois minimal, aucun niveau n\'est prononcé (FR-091)', a
     + 'sur rien passerait pour de la connaissance');
 });
 
-test('un niveau ne se rend jamais sans les facteurs qui l\'ont formé (FR-089)', async () => {
+test('un niveau ne se rend jamais sans les facteurs qui l\'ont formé (FR-086)', async () => {
   const muets = await q(`
     SELECT commerce_id, score
       FROM app.v_risque_defaut
@@ -298,7 +298,7 @@ test('la feuille de route ordonne par le risque, sans jamais primer le motif', a
 });
 
 // ===========================================================================
-//  Qui a le droit de voir (FR-092)
+//  Qui a le droit de voir (FR-088)
 // ===========================================================================
 
 test('un agent de terrain n\'accède pas à l\'indicateur', async () => {
@@ -325,7 +325,7 @@ test('le superviseur lit l\'indicateur, avec ses facteurs', async () => {
   assert.equal(r.statut, 200, `accès superviseur refusé : ${r.texte}`);
   for (const ligne of r.json.donnees) {
     assert.ok(Array.isArray(ligne.facteurs),
-      'une ligne sans tableau de facteurs : FR-089 interdit de l\'afficher');
+      'une ligne sans tableau de facteurs : FR-086 interdit de l\'afficher');
     assert.ok(['indetermine', 'faible', 'attention', 'eleve'].includes(ligne.niveau),
       `niveau inconnu : ${ligne.niveau}`);
   }

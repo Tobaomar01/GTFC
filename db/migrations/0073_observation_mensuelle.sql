@@ -1,6 +1,6 @@
 -- ===========================================================================
 --  La memoire mensuelle des situations
---  Exigences FR-086 a FR-088 (specification, session 2026-09-08)
+--  Exigences FR-082 a FR-084 (specification, session 2026-09-08)
 --
 --  POURQUOI UNE TABLE, alors que 0064 defendait une VUE.
 --
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS app.observation_mensuelle (
     nb_visites_mois        integer NOT NULL,
     commerce_archive       boolean NOT NULL,
 
-    -- --- Le remplacement (FR-087) ------------------------------------------
+    -- --- Le remplacement (FR-083) ------------------------------------------
     -- Pas de pointeur vers l'observation remplacante : il faudrait l'inserer
     -- AVANT de retirer l'ancienne du champ, ce que l'index partiel refuse.
     -- L'ordre par arretee_le sur (commerce_id, mois) dit la succession sans
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS app.observation_mensuelle (
 
 COMMENT ON TABLE app.observation_mensuelle IS
     'Photographie datee et figee de la situation d''un commerce a la fin d''un '
-    'mois. Immuable : une correction se fait par remplacement (FR-087).';
+    'mois. Immuable : une correction se fait par remplacement (FR-083).';
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_observation_en_vigueur
     ON app.observation_mensuelle (commerce_id, mois)
@@ -119,7 +119,7 @@ AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
         RAISE EXCEPTION
-            'Une observation mensuelle ne se supprime pas : elle se remplace (FR-087).'
+            'Une observation mensuelle ne se supprime pas : elle se remplace (FR-083).'
             USING ERRCODE = 'restrict_violation';
     END IF;
 
@@ -147,7 +147,7 @@ BEGIN
     THEN
         RAISE EXCEPTION
             'Une observation arretee ne se reecrit pas : en arreter une nouvelle, '
-            'qui remplacera celle-ci (FR-087).'
+            'qui remplacera celle-ci (FR-083).'
             USING ERRCODE = 'restrict_violation';
     END IF;
 

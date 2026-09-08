@@ -19,7 +19,7 @@ const PAGES = [
   { href: '/recouvrement', libelle: 'Recouvrement', icone: '◈', role: 'superviseur' },
   { href: '/agents', libelle: 'Agents', icone: '☗', role: 'superviseur' },
   { href: '/audit', libelle: "Journal d'audit", icone: '⎗', role: 'superviseur' },
-  // Réservé à la mairie (FR-092) : l'agent de terrain ne voit pas de niveau,
+  // Réservé à la mairie (FR-088) : l'agent de terrain ne voit pas de niveau,
   // il reçoit un motif de visite en clair.
   { href: '/accompagnement', libelle: 'Accompagnement', icone: '◷', role: 'superviseur' },
   { href: '/parametres', libelle: 'Paramètres', icone: '⚙', role: 'admin_commune' },

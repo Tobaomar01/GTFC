@@ -1,6 +1,6 @@
 -- ===========================================================================
 --  La feuille de route s'ordonne aussi par le risque de defaut
---  Exigence FR-092 (specification, session 2026-09-08)
+--  Exigence FR-088 (specification, session 2026-09-08)
 --
 --  L'indicateur ne servait a rien. Il s'affichait sur une page que personne
 --  n'a le temps d'ouvrir tous les matins, et les tournees continuaient d'etre
@@ -15,7 +15,7 @@
 --
 --  L'AGENT NE VOIT TOUJOURS AUCUN NIVEAU. Seul l'ORDRE des lignes change. Il
 --  lit le meme motif en clair qu'avant — « paiement interrompu » — qui dit
---  quoi faire sans porter de jugement sur la personne visitee (FR-092).
+--  quoi faire sans porter de jugement sur la personne visitee (FR-088).
 --
 --  UN COMMERCE SANS MEMOIRE NE PERD RIEN : score zero, et il garde son rang
 --  d'anciennete. Pendant toute la phase ou l'historique est mince, cette

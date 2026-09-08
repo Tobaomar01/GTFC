@@ -2,15 +2,15 @@
 
 *Ouvert le 08/09/2026. À trancher avant la fin de la phase bêta.*
 
-La plateforme sait désormais garder, à chaque clôture de période, une photographie
+La plateforme sait désormais garder, à la fin de chaque mois, une photographie
 figée de la situation de chaque commerce facturé, et en tirer un indicateur de risque
 de défaut de paiement. Cet indicateur sert à **ordonner les visites d'accompagnement**,
 rien d'autre : il ne déclenche aucun acte administratif, ne descend pas sur le téléphone
-des agents et n'apparaît dans aucun message au redevable (FR-092).
+des agents et n'apparaît dans aucun message au redevable (FR-088).
 
 Les valeurs livrées ci-dessous sont **provisoires**. Elles sont posées en base, dans
 `app.commune_parametre`, précisément pour que la mairie puisse les changer par
-délibération sans redéploiement (FR-090). Tant qu'elles n'ont pas été validées, elles
+délibération sans redéploiement (FR-087). Tant qu'elles n'ont pas été validées, elles
 n'engagent que le pilote.
 
 ---
@@ -21,11 +21,11 @@ L'indicateur repose sur cinq facteurs observés. Chacun porte un poids.
 
 | Facteur | Ce qu'il constate | Poids provisoire |
 |---|---|---|
-| Jamais rien réglé | Aucun versement sur aucune période observée | 40 |
-| Règlement interrompu | A réglé, puis plus rien sur la dernière période close | 25 |
-| Retard habituel | Règle après la date d'exigibilité plus souvent qu'avant | 15 |
-| Règlement partiel répété | Solde restant dû à la clôture, plusieurs périodes de suite | 15 |
-| Relances répétées | Nombre moyen de relances par période au-dessus du seuil | 5 |
+| Jamais rien réglé | Aucun versement depuis le premier avis | 40 |
+| Règlement interrompu | A réglé, puis plus rien depuis le délai d'interruption | 25 |
+| Retard habituel | Échéance dépassée la plupart des mois observés | 15 |
+| Règlement partiel répété | Verse sans solder, plusieurs mois de suite | 15 |
+| Relances répétées | Plus d'avis relancés que le seuil toléré | 5 |
 
 **Questions :**
 
@@ -45,15 +45,19 @@ finit par rentrer.
 
 | Paramètre | Valeur provisoire | Ce qu'il commande |
 |---|---|---|
-| Périodes observées minimales | 2 | En deçà, l'indicateur répond « indéterminé » plutôt qu'un chiffre (FR-091) |
+| Mois observés minimaux | 2 | En deçà, l'indicateur répond « indéterminé » plutôt qu'un chiffre (FR-087) |
 | Seuil « attention » | 30 | À partir de ce total, le commerce remonte dans la liste |
-| Seuil « élevé » | 60 | À partir de ce total, il est proposé en priorité sur la feuille de route |
-| Relances tolérées par période | 1 | Au-delà, le facteur « relances répétées » s'applique |
+| Seuil « élevé » | 60 | À partir de ce total, il passe devant à l'intérieur de son motif de visite |
+| Délai d'interruption | 60 jours | Au-delà, un commerce qui avait réglé est dit « interrompu » |
+| Avis relancés tolérés | 1 | Au-delà, le facteur « relances répétées » s'applique |
 
 **Questions :**
 
-2.1 Deux périodes observées suffisent-elles pour se prononcer ? Le pilote portant sur des
-périodes mensuelles, deux mois est court. Trois ?
+2.1 Deux mois observés suffisent-ils pour se prononcer ? C'est court. Trois donnerait un
+avis plus sûr, au prix d'un mois de plus avant que l'outil ne serve à quoi que ce soit.
+
+2.3 Soixante jours sans versement valent-ils « interruption » ? Un commerce saisonnier
+peut fermer plus longtemps sans être en difficulté.
 
 2.2 Les deux seuils correspondent-ils à ce que la mairie est en mesure d'absorber ? Un
 seuil bas désigne beaucoup de commerces et sature les tournées ; un seuil haut n'en
@@ -66,11 +70,11 @@ tournées, pas d'un principe.
 écarté du calcul, ou compté comme à jour ? Le code livré l'écarte : une exonération est
 une décision de la mairie, pas un comportement du commerçant.
 
-3.2 Une **contestation en cours** doit-elle suspendre l'indicateur pour la période
-contestée ? Le code livré la traite comme un motif de neutralisation : tant que le
+3.2 Une **contestation en cours** doit-elle suspendre l'indicateur pour le mois
+contesté ? Le code livré la traite comme un motif de neutralisation : tant que le
 montant est discuté, le non-paiement n'est pas un défaut. À confirmer.
 
-3.3 Un commerce **archivé** en cours de période — fermé, déménagé — doit-il conserver ses
+3.3 Un commerce **archivé** en cours de mois — fermé, déménagé — doit-il conserver ses
 observations passées ? Le code les conserve : elles décrivent une réalité qui a eu lieu.
 
 ## 4. Durée de conservation
@@ -92,5 +96,5 @@ la liste de ses observations ? Le portail ne l'expose pas aujourd'hui.
   interrompu » — jamais une note. Un agent qui lit « risque élevé » sur son téléphone ne
   parle pas de la même façon au commerçant qu'il visite.
 - **Méthode** (08/09/2026, commanditaire) : règles explicites et pondérations en base.
-  Pas de modèle appris : il n'y a rien à apprendre sur une seule période, et un modèle
-  appris n'explique pas sa sortie au commerçant qui conteste.
+  Pas de modèle appris : il n'y a rien à apprendre sur quelques mois, et un modèle appris
+  n'explique pas sa sortie au commerçant qui conteste.

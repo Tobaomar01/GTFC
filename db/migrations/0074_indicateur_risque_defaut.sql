@@ -1,20 +1,20 @@
 -- ===========================================================================
 --  L'indicateur de risque de defaut de paiement
---  Exigences FR-089 a FR-092 (specification, session 2026-09-08)
+--  Exigences FR-085 a FR-088 (specification, session 2026-09-08)
 --
 --  CE QU'IL EST, ET CE QU'IL N'EST PAS.
 --
 --  Il sert a ORDONNER LES VISITES D'ACCOMPAGNEMENT : a qui le temps d'un agent
 --  profite-t-il le plus. Il ne declenche aucun acte administratif, ne descend
 --  pas sur le telephone des agents, et n'apparait dans aucun message au
---  redevable (FR-092). L'agent continue de lire un MOTIF en clair — « paiement
+--  redevable (FR-088). L'agent continue de lire un MOTIF en clair — « paiement
 --  interrompu » — jamais une note. Quelqu'un qui lit « risque eleve » avant
 --  d'entrer ne parle pas de la meme facon a la personne qu'il visite.
 --
 --  POURQUOI DES REGLES ET PAS UN MODELE. Il n'y a rien a apprendre : la base
 --  porte quelques mois. Et un modele appris n'explique pas sa sortie au
 --  commercant qui la conteste. Ici chaque facteur est nomme, pese, et rendu
---  AVEC le niveau — FR-089 interdit d'afficher l'un sans les autres.
+--  AVEC le niveau — FR-086 interdit d'afficher l'un sans les autres.
 --
 --  POURQUOI LES POIDS SONT EN BASE. Un seuil de recouvrement se decide par
 --  deliberation du conseil municipal, pas par deploiement (principe VIII).
@@ -46,7 +46,7 @@ ALTER TABLE app.commune_parametre
 
 COMMENT ON COLUMN app.commune_parametre.risque_mois_minimaux IS
     'En deca de ce nombre de mois observes, l''indicateur repond « indetermine » '
-    '(FR-091). Un chiffre calcule sur un historique trop mince est une illusion '
+    '(FR-087). Un chiffre calcule sur un historique trop mince est une illusion '
     'de connaissance.';
 
 COMMENT ON COLUMN app.commune_parametre.risque_seuil_eleve IS
@@ -113,7 +113,7 @@ SELECT
     c.nb_mois,
     c.dernier_mois,
     f.score,
-    -- FR-091 : en deca du minimum, aucun niveau. Le score reste lisible, mais
+    -- FR-087 : en deca du minimum, aucun niveau. Le score reste lisible, mais
     -- il ne CLASSE pas — c'est la difference entre une mesure et un jugement.
     CASE
         WHEN c.nb_mois < p.risque_mois_minimaux    THEN 'indetermine'
@@ -122,7 +122,7 @@ SELECT
         ELSE 'faible'
     END AS niveau,
     p.risque_mois_minimaux AS mois_minimaux,
-    -- FR-089 : le niveau ne se montre jamais sans ce qui l'a forme.
+    -- FR-086 : le niveau ne se montre jamais sans ce qui l'a forme.
     coalesce(f.facteurs, '[]'::jsonb) AS facteurs
   FROM comptes c
   JOIN app.commune_parametre p ON p.commune_id = c.commune_id
@@ -170,7 +170,7 @@ ALTER VIEW app.v_risque_defaut SET (security_invoker = true);
 COMMENT ON VIEW app.v_risque_defaut IS
     'Indicateur de risque de defaut, lu sur les observations arretees. Rend le '
     'niveau ET les facteurs qui l''ont forme : afficher l''un sans les autres '
-    'viole FR-089. Reserve aux profils de la mairie (FR-092).';
+    'viole FR-086. Reserve aux profils de la mairie (FR-088).';
 
 GRANT SELECT ON app.v_risque_defaut TO gtfc_app;
 

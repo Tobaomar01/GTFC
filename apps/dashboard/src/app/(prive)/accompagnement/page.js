@@ -7,7 +7,7 @@
  *  CE QUE CETTE PAGE EST, ET CE QU'ELLE N'EST PAS
  *
  *  Elle ordonne des VISITES D'EXPLICATION. Elle ne décide rien : ni relance,
- *  ni mise en recouvrement, ni pénalité (FR-092). Un indicateur n'est pas une
+ *  ni mise en recouvrement, ni pénalité (FR-088). Un indicateur n'est pas une
  *  décision administrative, et le jour où il en déclencherait une, il faudrait
  *  l'écrire dans la constitution avant de l'écrire dans le code.
  *
@@ -16,13 +16,13 @@
  *  quoi faire sans porter de jugement. Quelqu'un qui lit « risque élevé »
  *  avant d'entrer ne parle pas de la même façon à la personne qu'il visite.
  *
- *  LE NIVEAU NE S'AFFICHE JAMAIS SEUL. FR-089 : chaque ligne porte les
+ *  LE NIVEAU NE S'AFFICHE JAMAIS SEUL. FR-086 : chaque ligne porte les
  *  facteurs qui l'ont formée. Un classement qu'on ne peut pas expliquer au
  *  commerçant qu'il désigne n'a rien à faire dans une administration — et un
  *  superviseur qui envoie un agent doit pouvoir dire pourquoi.
  *
  *  « INDÉTERMINÉ » EST UNE RÉPONSE. En dessous du nombre de mois observés
- *  minimal, le système refuse de classer (FR-091). Ce n'est pas un défaut
+ *  minimal, le système refuse de classer (FR-087). Ce n'est pas un défaut
  *  d'affichage : c'est le refus de faire passer un historique trop mince pour
  *  de la connaissance.
  * ─────────────────────────────────────────────────────────────────────────
@@ -171,7 +171,7 @@ export default function PageAccompagnement() {
                   : String(l.nb_mois)),
               },
               {
-                // FR-089 : le niveau ne se montre jamais sans ce qui l'a formé.
+                // FR-086 : le niveau ne se montre jamais sans ce qui l'a formé.
                 // Ce n'est pas un détail que l'on déplie : c'est la ligne.
                 cle: 'facteurs',
                 titre: 'Ce qui l’a formé',
