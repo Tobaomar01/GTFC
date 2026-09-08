@@ -151,8 +151,16 @@ const config = {
     // les codes à usage unique s'affichent dans le journal du serveur
     // (sms.service.js, mode simulation).
     //
-    // Le jour où un opérateur est retenu : SMS_FOURNISSEUR=orange|generique,
-    // SMS_BASE_URL, SMS_API_KEY, SMS_ACTIF=true. Aucun code ne change.
+    // Le jour où un opérateur est retenu : SMS_FOURNISSEUR=generique,
+    // SMS_BASE_URL, SMS_API_KEY, SMS_ACTIF=true. Aucun code ne change — et
+    // c'est éprouvé de bout en bout par scripts/repetition-generale.sh, qui
+    // fait sortir un vrai code par une passerelle parlant ce protocole.
+    //
+    // CE N'EST PAS VRAI DE « orange ». Le pilote correspondant pose la clé
+    // dans un en-tête Bearer, alors que l'API Orange Developer demande un
+    // jeton OAuth2 obtenu par échange de justificatifs — échange qui n'est
+    // écrit nulle part. Choisir Orange demande donc du CODE, pas un réglage.
+    // Le contrôle plus bas le refuse plutôt que de le laisser croire.
     fournisseur: optionnel('SMS_FOURNISSEUR', ''),
     actif: booleen('SMS_ACTIF', false) && Boolean(optionnel('SMS_FOURNISSEUR', '')),
     // Autoriser explicitement la SIMULATION en production. Sans elle, l'API
@@ -188,6 +196,17 @@ config.stockage.secretKey = obligatoire('MINIO_SECRET_KEY', { min: 8 });
 
 if (config.production && config.serveur.corsOrigines.length === 0) {
   erreurs.push('CORS_ORIGINS doit lister les domaines du dashboard en production');
+}
+// Le pilote « orange » n'est pas terminé : il met SMS_API_KEY dans un en-tête
+// Bearer, quand l'API Orange Developer attend un jeton OAuth2 obtenu par
+// échange — et un jeton expire, ce qui ferait tomber la campagne mensuelle en
+// pleine nuit. Mieux vaut refuser au démarrage que de le découvrir au premier
+// code à usage unique qui n'arrive pas.
+if (config.sms.actif && config.sms.fournisseur === 'orange') {
+  erreurs.push("SMS_FOURNISSEUR=orange n’est pas utilisable : l’échange OAuth2 "
+    + "que l’API Orange Developer exige n’est pas implémenté. Passer par un "
+    + "agrégateur (SMS_FOURNISSEUR=generique), seul protocole éprouvé de bout en "
+    + "bout, ou écrire le pilote Orange avant de l’activer.");
 }
 if (config.sms.actif && !config.sms.baseUrl) {
   erreurs.push('SMS_BASE_URL est obligatoire dès que SMS_ACTIF=true : '
