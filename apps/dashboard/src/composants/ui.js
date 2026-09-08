@@ -168,6 +168,14 @@ export function Message({ type = 'info', titre, children }) {
 
 // ---------------------------------------------------------------------------
 export function Tableau({ colonnes, lignes, cle, vide = 'Aucune donnée', compact = false }) {
+  // « cle » nomme un champ ('id'), ou calcule l’identité d’une ligne qui n’en
+  // a pas : la vue des données provisoires n’a pas de clé primaire — son
+  // identité est le couple (entite, libelle). Nommer un champ absent donnait
+  // une clé indéfinie sur CHAQUE ligne, sans que rien ne le signale.
+  const cleLigne = typeof cle === 'function'
+    ? cle
+    : (ligne, i) => (cle ? ligne[cle] : i);
+
   if (!lignes || lignes.length === 0) {
     return <p className="py-8 text-center text-sm text-encre-attenuee">{vide}</p>;
   }
@@ -176,8 +184,8 @@ export function Tableau({ colonnes, lignes, cle, vide = 'Aucune donnée', compac
       <table className="w-full min-w-full text-sm">
         <thead>
           <tr className="border-b border-grille text-left">
-            {colonnes.map((c) => (
-              <th key={c.cle}
+            {colonnes.map((c, iCol) => (
+              <th key={c.cle ?? `colonne-${iCol}`}
                 className={`whitespace-nowrap pb-2 pr-4 text-[13px] font-semibold text-encre-2
                   ${c.alignement === 'droite' ? 'text-right' : ''}`}
               >
@@ -188,11 +196,11 @@ export function Tableau({ colonnes, lignes, cle, vide = 'Aucune donnée', compac
         </thead>
         <tbody>
           {lignes.map((ligne, i) => (
-            <tr key={cle ? ligne[cle] : i}
+            <tr key={cleLigne(ligne, i)}
               className="border-b border-grille last:border-0 hover:bg-surface-alt"
             >
-              {colonnes.map((c) => (
-                <td key={c.cle}
+              {colonnes.map((c, iCol) => (
+                <td key={c.cle ?? `colonne-${iCol}`}
                   className={`${compact ? 'py-1.5' : 'py-2.5'} pr-4 align-top text-encre
                     ${c.alignement === 'droite' ? 'text-right chiffres-alignes' : ''}
                     ${c.monospace ? 'font-mono text-[13px]' : ''}`}

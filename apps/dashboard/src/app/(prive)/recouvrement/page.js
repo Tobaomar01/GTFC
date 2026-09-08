@@ -148,7 +148,7 @@ export default function PageRecouvrement() {
         >
           <BarresEmpilees
             lignes={periodes.filter((p) => p.montant_attendu > 0).map((p) => ({
-              cle: p.periode_id,
+              cle: p.id,
               libelle: moisFr(p.code),
               recouvre: Number(p.montant_recouvre) || 0,
               restant: Number(p.montant_restant) || 0,

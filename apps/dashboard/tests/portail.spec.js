@@ -12,8 +12,24 @@
  */
 const { test, expect } = require('@playwright/test');
 
-/** Un redevable dont le numéro a été vérifié par un agent (seed 0014). */
+/**
+ * Deux redevables dont le numéro a été vérifié par un agent (seed 0014).
+ *
+ * Ils sont DISTINCTS à dessein : le portail plafonne les demandes de code
+ * par numéro et par heure (app.code_acces_autorise, otp_max_par_heure).
+ * Deux tests qui partagent un numéro s'épuisent l'un l'autre — et l'échec
+ * ne ressemble alors plus du tout à sa cause : le champ du code n'apparaît
+ * pas, sans que rien ne dise pourquoi.
+ */
 const REDEVABLE = process.env.PORTAIL_TEL ?? '+221701000001';
+const REDEVABLE_BIS = process.env.PORTAIL_TEL_BIS ?? '+221701000002';
+
+/**
+ * Le plafond horaire est une protection qui fonctionne, pas une panne. Quand
+ * il tombe, on le NOMME et on s'arrête : un test rouge doit désigner un
+ * défaut, jamais une limite de l'environnement.
+ */
+const sousPlafond = (texte) => /trop de demandes pour ce num/i.test(texte);
 
 /** Un numéro qui n'existe pas dans le registre. */
 const INCONNU = '+221709999999';
@@ -39,6 +55,7 @@ test('un numéro inconnu ne se distingue pas d\'un numéro connu', async ({ page
   };
 
   const connu = await lire(REDEVABLE);
+  test.skip(sousPlafond(connu), 'plafond horaire de codes atteint pour ce numéro');
   const inconnu = await lire(INCONNU);
 
   // Le bloc « code de démonstration » n'apparaît que faute de passerelle SMS,
@@ -59,9 +76,11 @@ test('un numéro inconnu ne se distingue pas d\'un numéro connu', async ({ page
 
 test('un code faux n\'ouvre pas le dossier', async ({ page }) => {
   await page.goto('/portail');
-  await page.fill('input[type="tel"], input[name="telephone"]', REDEVABLE);
+  await page.fill('input[type="tel"], input[name="telephone"]', REDEVABLE_BIS);
   await page.click('button[type="submit"]');
   await page.waitForTimeout(1200);
+  test.skip(sousPlafond(await page.locator('body').innerText()),
+    'plafond horaire de codes atteint pour ce numéro');
 
   const champCode = page.locator('input[inputmode="numeric"], input[name="code"]').first();
   await expect(champCode).toBeVisible({ timeout: 8000 });

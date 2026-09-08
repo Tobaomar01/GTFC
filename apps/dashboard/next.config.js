@@ -10,6 +10,14 @@
 const nextConfig = {
   reactStrictMode: true,
 
+  // « next dev » de Next 16 n'autorise que « localhost » comme origine : servi
+  // sur 127.0.0.1 — l'adresse employée partout ailleurs dans le projet — il
+  // renvoie 403 sur ses propres morceaux de JavaScript. La page s'affiche,
+  // mais morte : le formulaire de connexion repart alors en GET natif, et les
+  // tests de navigateur attendent une redirection qui ne viendra pas.
+  // Option de développement seule : « next start » ne la lit pas.
+  allowedDevOrigins: ["127.0.0.1"],
+
   // L'application est servie sur le serveur de la commune : on n'expose pas la
   // version de Next dans les en-têtes.
   poweredByHeader: false,

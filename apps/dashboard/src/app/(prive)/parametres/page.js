@@ -60,7 +60,7 @@ function Contenu() {
             Une quittance fausse engage la mairie.
           </Message>
           <div className="mt-3">
-            <Tableau compact cle="id" lignes={provisoires.slice(0, 60)}
+            <Tableau compact cle={(l) => `${l.entite}/${l.libelle}`} lignes={provisoires.slice(0, 60)}
               colonnes={[
                 { cle: 'entite', titre: 'Type' },
                 { cle: 'libelle', titre: 'Libellé' },
