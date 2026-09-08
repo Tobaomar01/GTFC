@@ -22,6 +22,28 @@
 # ============================================================================
 set -Eeuo pipefail
 
+# ---------------------------------------------------------------------------
+#  Ce script est appele SANS TERMINAL par scripts/deployer.sh (avec </dev/null).
+#  « read » y rencontre une fin de fichier et rend un code non nul : sous
+#  set -e, le script mourait AU PREMIER PROMPT, silencieusement, code 1, sans
+#  un mot d'explication. Meme avec un domaine et un DNS corrects, l'etape 4 du
+#  deploiement ne pouvait donc JAMAIS obtenir de certificat.
+#
+#  Sans terminal, chaque question prend la reponse qui NE SURPREND PAS :
+#   · confirmer les informations  -> oui, le deployeur les a deja verifiees ;
+#   · passer outre un avertissement -> NON, on ne force pas une anomalie
+#     detectee sans que quelqu'un l'ait decidee ;
+#   · remplacer un certificat existant -> NON, on garde ce qui marche.
+#  Dans tous les cas, la reponse retenue est ANNONCEE.
+# ---------------------------------------------------------------------------
+interactif() { [[ -t 0 ]]; }
+demander() {  # demander <question> <reponse-sans-terminal>
+    local question="$1" defaut="$2" r=""
+    if interactif; then read -rp "$question" r || r=""
+    else r="$defaut"; echo "${question}${r}   (sans terminal : réponse par défaut)"; fi
+    [[ "$r" =~ ^[oO]$ ]]
+}
+
 BOLD=$'\033[1m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[0;33m'; RED=$'\033[0;31m'; NC=$'\033[0m'
 info() { echo "${GREEN}[OK]${NC}    $*"; }
 step() { echo; echo "${BOLD}==> $*${NC}"; }
@@ -73,8 +95,7 @@ echo "${BOLD}Email           :${NC} ${LETSENCRYPT_EMAIL}"
 echo "${BOLD}Noms couverts   :${NC} ${DOMAINS[*]}"
 [[ "${LETSENCRYPT_STAGING:-0}" == "1" ]] && warn "MODE TEST (staging) — les certificats obtenus ne seront PAS reconnus par les navigateurs."
 echo
-read -rp "Ces informations sont-elles correctes ? [o/N] " confirm
-[[ "$confirm" =~ ^[oO]$ ]] || { echo "Annulé."; exit 1; }
+demander "Ces informations sont-elles correctes ? [o/N] " "o" || { echo "Annulé."; exit 1; }
 
 # ============================================================================
 step "1/6  Vérification DNS"
@@ -85,7 +106,12 @@ PUBLIC_IP="$(curl -fsS --max-time 10 https://api.ipify.org || echo '')"
 
 DNS_KO=0
 for d in "${DOMAINS[@]}"; do
-    resolved="$(getent hosts "$d" 2>/dev/null | awk '{print $1}' | head -1)"
+    # « getent hosts » rend 2 quand le nom ne resout pas, et pipefail propage
+    # ce code : sous set -e, le script mourait ICI, avant le bloc ecrit
+    # precisement pour expliquer quels enregistrements manquent. Le diagnostic
+    # etait inatteignable au moment exact ou il sert. Un nom qui ne resout pas
+    # n'est pas une erreur du script : c'est ce qu'il vient constater.
+    resolved="$(getent hosts "$d" 2>/dev/null | awk '{print $1}' | head -1 || true)"
     if [[ -z "$resolved" ]]; then
         echo "  ${RED}✗${NC} ${d} — ne résout pas"
         DNS_KO=1
@@ -99,7 +125,7 @@ done
 
 if [[ $DNS_KO -eq 1 ]]; then
     warn "Au moins un enregistrement DNS n'est pas correct. Let's Encrypt échouera."
-    read -rp "Continuer quand même ? [o/N] " r; [[ "$r" =~ ^[oO]$ ]] || exit 1
+    demander "Continuer quand même ? [o/N] " "n" || { echo "Interrompu : une anomalie a été détectée, et personne ne peut décider de passer outre." >&2; exit 1; }
 fi
 
 # ============================================================================
@@ -145,7 +171,7 @@ if curl -fsS --max-time 10 "http://${APP_DOMAIN}/.well-known/acme-challenge/test
 else
     warn "Le fichier de défi ACME n'est PAS accessible depuis http://${APP_DOMAIN}/"
     warn "Causes fréquentes : port 80 non redirigé sur la box Sonatel, ou DNS non propagé."
-    read -rp "Continuer quand même ? [o/N] " r; [[ "$r" =~ ^[oO]$ ]] || exit 1
+    demander "Continuer quand même ? [o/N] " "n" || { echo "Interrompu : une anomalie a été détectée, et personne ne peut décider de passer outre." >&2; exit 1; }
 fi
 rm -f "${WEBROOT}/.well-known/acme-challenge/test-gtfc" "${WEBROOT}/.test-acme"
 
@@ -153,8 +179,7 @@ rm -f "${WEBROOT}/.well-known/acme-challenge/test-gtfc" "${WEBROOT}/.test-acme"
 step "5/6  Demande du certificat à Let's Encrypt"
 # ============================================================================
 if [[ $EXISTING_CERT -eq 1 ]]; then
-    read -rp "Un certificat existe déjà. Le remplacer ? [o/N] " r
-    [[ "$r" =~ ^[oO]$ ]] || { info "Conservation du certificat existant."; exit 0; }
+    demander "Un certificat existe déjà. Le remplacer ? [o/N] " "n" || { info "Conservation du certificat existant."; exit 0; }
 fi
 
 # Le dossier live/ doit être vide sinon certbot crée un suffixe -0001

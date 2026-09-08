@@ -269,7 +269,12 @@ etape_3() {
   local kos=0
   for n in "${noms[@]}"; do
     local resolu
-    resolu=$(getent hosts "$n" 2>/dev/null | awk '{print $1}' | head -1)
+    # « getent hosts » rend 2 quand le nom ne resout pas, et pipefail propage
+    # ce code : sous set -e, le script mourait ICI, avant le bloc ecrit
+    # precisement pour expliquer quels enregistrements manquent. Le diagnostic
+    # etait inatteignable au moment exact ou il sert. Un nom qui ne resout pas
+    # n'est pas une erreur du script : c'est ce qu'il vient constater.
+    resolu=$(getent hosts "$n" 2>/dev/null | awk '{print $1}' | head -1 || true)
     if [[ -z "$resolu" ]]; then
       echec "$n — ne résout pas"; kos=$((kos + 1))
     elif [[ -n "$ipPublique" && "$resolu" != "$ipPublique" ]]; then
