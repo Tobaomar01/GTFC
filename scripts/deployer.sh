@@ -204,10 +204,15 @@ etape_2() {
   charger_env
 
   local restants
-  restants=$(grep -c 'A_REMPLIR' "${RACINE}/.env" || true)
+  # Les lignes de COMMENTAIRE sont exclues : le gabarit porte lui-meme, en
+  # tete, « remplir TOUTES les valeurs marquees A_REMPLIR ». Sans cette
+  # exclusion, un .env parfaitement rempli comptait quand meme une occurrence,
+  # et le deploiement s'arretait a l'etape 2 en reclamant de remplir une ligne
+  # de documentation. Aucun serveur ne pouvait franchir cette etape.
+  restants=$(grep -c '^[^#]*A_REMPLIR' "${RACINE}/.env" || true)
   if [[ "$restants" -gt 0 ]]; then
     echo
-    grep -n 'A_REMPLIR' "${RACINE}/.env" | sed 's/^/      /' | head -12
+    grep -n '^[^#]*A_REMPLIR' "${RACINE}/.env" | sed 's/^/      /' | head -12
     echo
     abandonner \
       "$restants valeur(s) encore à remplir dans le .env." \
@@ -622,10 +627,15 @@ etape_12() {
   info "Accès publics (HTTPS) :"
   for hote in "api.${APP_DOMAIN}/healthz" "gtfc.${APP_DOMAIN}" "console.${APP_DOMAIN}"; do
     local code
-    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 12 "https://${hote}" 2>/dev/null || echo 000)
+    # PAS de « || echo 000 » : curl ECRIT DEJA 000 quand il ne joint rien, et
+    # sort en erreur. Les deux se concatenaient en « 000000 », qui ne
+    # correspondait plus au motif 000 ci-dessous : un hote TOTALEMENT
+    # injoignable passait dans le cas generique, en simple avertissement.
+    # Meme defaut que celui corrige dans scripts/healthcheck.sh.
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 12 "https://${hote}" 2>/dev/null)
     case "$code" in
       200|301|302|307) ok "https://${hote} → $code" ;;
-      000) echec "https://${hote} — injoignable depuis le serveur" ;;
+      000|"") echec "https://${hote} — injoignable depuis le serveur" ;;
       *)   avertir "https://${hote} → $code" ;;
     esac
   done
@@ -638,6 +648,12 @@ etape_12() {
 # ============================================================================
 #  Exécution
 # ============================================================================
+# Ce qui bloquerait un deploiement reel. Compte en simulation seulement : en
+# execution, abandonner() arrete tout des le premier obstacle, et c'est bien
+# ce qu'on veut — on ne poursuit pas une installation sur un prerequis absent.
+BLOCAGES=0
+BLOQUANTES=()
+
 for i in "${!ETAPES[@]}"; do
   n=$((i + 1))
   [[ $n -lt $DEPUIS || $n -gt $JUSQUA ]] && continue
@@ -649,11 +665,31 @@ for i in "${!ETAPES[@]}"; do
 
   titre "$n" "${ETAPES[$i]}"
   ETAPE_COURANTE="${ETAPES[$i]}"
-  "etape_$n"
-  [[ "$SIMULATION" == "0" ]] && marquer_fait "etape-$n"
+  if [[ "$SIMULATION" == "1" ]]; then
+    # « Montrer le plan » suppose de montrer AUSSI les etapes suivantes. Le
+    # sous-shell borne l'abandon a l'etape en cours : sans lui, la simulation
+    # s'arretait au premier prerequis manquant — le DNS, typiquement, qui
+    # n'existe pas encore quand on prepare un serveur — et ne montrait jamais
+    # les neuf etapes suivantes, c'est-a-dire l'essentiel du plan.
+    if ! ( "etape_$n" ); then
+      BLOCAGES=$((BLOCAGES + 1))
+      BLOQUANTES+=("$n. ${ETAPES[$i]}")
+    fi
+  else
+    "etape_$n"
+    marquer_fait "etape-$n"
+  fi
 done
 
 # ============================================================================
+if [[ "$SIMULATION" == "1" && "$BLOCAGES" -gt 0 ]]; then
+  echo
+  echec "$BLOCAGES etape(s) bloqueraient un deploiement reel :"
+  for e in "${BLOQUANTES[@]}"; do echo "    · $e"; done
+  echo
+  exit 1
+fi
+
 echo
 echo "${GRAS}${VERT}━━━ Déploiement terminé ━━━${NC}"
 echo

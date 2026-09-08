@@ -125,7 +125,10 @@ ufw --force reset >/dev/null
 ufw default deny incoming  >/dev/null
 ufw default allow outgoing >/dev/null
 ufw allow 22/tcp  comment 'SSH'   >/dev/null
-ufw allow 80/tcp  comment 'HTTP — Let'\''s Encrypt + redirection' >/dev/null
+# ufw REFUSE toute apostrophe dans un commentaire : « Let's Encrypt » faisait
+# echouer la regle, et avec elle l'installation entiere a l'etape 5 sur 10.
+# Le message, « ERROR: Invalid syntax », ne designe ni le caractere ni la ligne.
+ufw allow 80/tcp  comment 'HTTP — validation du certificat et redirection' >/dev/null
 ufw allow 443/tcp comment 'HTTPS' >/dev/null
 ufw --force enable >/dev/null
 info "Pare-feu actif — ports ouverts : 22, 80, 443"
