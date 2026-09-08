@@ -61,10 +61,18 @@ END;
 $$;
 
 DROP TRIGGER IF EXISTS trg_refuser_avis_provisoire ON app.avis_imposition;
+-- « emis » SEULEMENT, pas « toute sortie de brouillon ».
+--
+-- Ecrite trop large, la regle refusait aussi l'enregistrement d'un PAIEMENT :
+-- imputer un versement fait passer l'avis en « partiellement_paye » ou « paye »,
+-- donc le fait sortir de brouillon, et le declencheur bloquait le chemin de
+-- l'argent. La constitution parle d'EMISSION — notifier une creance — pas de
+-- tout changement de statut. Encaisser ce qu'un redevable a deja verse n'est
+-- pas emettre.
 CREATE TRIGGER trg_refuser_avis_provisoire
     BEFORE UPDATE OF statut ON app.avis_imposition
     FOR EACH ROW
-    WHEN (NEW.statut <> 'brouillon' AND OLD.statut = 'brouillon')
+    WHEN (NEW.statut = 'emis' AND OLD.statut = 'brouillon')
     EXECUTE FUNCTION app.trg_refuser_avis_provisoire();
 
 -- Un avis cree DIRECTEMENT au statut emis contournerait le declencheur
@@ -73,7 +81,7 @@ DROP TRIGGER IF EXISTS trg_refuser_avis_provisoire_insert ON app.avis_imposition
 CREATE TRIGGER trg_refuser_avis_provisoire_insert
     AFTER INSERT ON app.avis_imposition
     FOR EACH ROW
-    WHEN (NEW.statut <> 'brouillon')
+    WHEN (NEW.statut = 'emis')
     EXECUTE FUNCTION app.trg_refuser_avis_provisoire();
 
 -- ---------------------------------------------------------------------------
@@ -116,10 +124,13 @@ GRANT SELECT ON app.v_avis_sur_bareme_provisoire TO gtfc_app;
 -- ---------------------------------------------------------------------------
 DO $verif$
 DECLARE
-    v_avis   uuid;
-    v_refuse boolean := false;
+    v_avis    uuid;
+    v_statut  text;
+    v_refuse  boolean := false;
 BEGIN
-    SELECT a.id INTO v_avis
+    -- On note le statut d'origine pour le REMETTRE : une migration qui eprouve
+    -- une regle ne doit pas laisser derriere elle un avis dans un autre etat.
+    SELECT a.id, a.statut::text INTO v_avis, v_statut
       FROM app.avis_imposition a
       JOIN app.avis_ligne al ON al.avis_id = a.id
       JOIN app.bareme_taxe b ON b.id = al.bareme_id
@@ -143,5 +154,20 @@ BEGIN
     END IF;
 
     RAISE NOTICE 'Declencheur eprouve : l''emission sur un bareme provisoire est refusee.';
+
+    -- Et le chemin de l'ARGENT doit rester ouvert : imputer un versement fait
+    -- sortir l'avis de brouillon sans l'emettre. Ecrite trop large, la regle
+    -- bloquait l'encaissement — defaut trouve par la verification sur base
+    -- neuve, pas par la lecture.
+    BEGIN
+        UPDATE app.avis_imposition SET statut = 'brouillon' WHERE id = v_avis;
+        UPDATE app.avis_imposition SET statut = 'partiellement_paye' WHERE id = v_avis;
+    EXCEPTION WHEN restrict_violation THEN
+        RAISE EXCEPTION 'La regle bloque l''imputation d''un paiement : elle est trop large.';
+    END;
+    RAISE NOTICE 'Chemin de l''argent : imputer un versement reste possible.';
+
+    -- Remise en etat.
+    UPDATE app.avis_imposition SET statut = v_statut::app.statut_avis WHERE id = v_avis;
 END
 $verif$;

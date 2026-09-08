@@ -29,7 +29,12 @@ const REDEVABLE_BIS = process.env.PORTAIL_TEL_BIS ?? '+221701000002';
  * il tombe, on le NOMME et on s'arrête : un test rouge doit désigner un
  * défaut, jamais une limite de l'environnement.
  */
-const sousPlafond = (texte) => /trop de demandes pour ce num/i.test(texte);
+// Deux plafonds distincts protègent ce portail, et ils ne disent pas la même
+// chose : le quota horaire par numéro (« trop de demandes pour ce numéro ») et
+// le limiteur d'appels (« trop de tentatives »). Les deux rendent la
+// comparaison sans objet — on les reconnaît tous les deux, sinon le test échoue
+// pour une raison qui n'a rien à voir avec ce qu'il éprouve.
+const sousPlafond = (texte) => /trop de (demandes|tentatives)/i.test(texte);
 
 /** Un numéro qui n'existe pas dans le registre. */
 const INCONNU = '+221709999999';
