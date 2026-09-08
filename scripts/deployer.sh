@@ -492,7 +492,12 @@ etape_9() {
 
   if [[ ! -d node_modules ]]; then
     info "npm ci du tableau de bord…"
-    executer npm ci --no-audit --no-fund
+    # --include=dev EST INDISPENSABLE. Le .env pose NODE_ENV=production, et npm
+    # ignore alors les devDependencies MEME sans --omit=dev. Or la compilation du
+    # tableau de bord en a besoin : tailwindcss, postcss et autoprefixer y sont,
+    # et sans eux « next build » ne produit aucune feuille de style. Le
+    # deploiement echouait ici sur un serveur neuf, quelle que soit la machine.
+    executer npm ci --include=dev --no-audit --no-fund
   else
     ok "Dépendances déjà installées"
   fi
