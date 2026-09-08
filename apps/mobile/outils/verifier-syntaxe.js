@@ -73,8 +73,29 @@ for (const fichier of [...fichiers].sort()) {
     }
   }
 
-  const enDur = source.match(/['"`]https?:\/\/(?!localhost|192\.168|api\.exemple)[^'"`\s]+/g);
-  if (enDur && !relatif.startsWith('src/api') && !relatif.includes('client.js')) {
+  // Ce que la règle vise : un point d'appel écrit en dur, qui enverrait
+  // l'application ailleurs que là où le client la dirige.
+  //
+  // Deux chaînes ressemblent à des URL sans en être. L'espace de noms SVG est
+  // un IDENTIFIANT, jamais appelé ; et le lien d'attribution de Leaflet ouvre
+  // le navigateur du téléphone si l'agent le touche — l'application ne le
+  // sollicite pas. On les écarte NOMMÉMENT plutôt que d'exempter le fichier
+  // entier : une URL vraiment nouvelle dans le bundle régénéré sera toujours
+  // refusée.
+  //
+  // Sans cela le contrôle échouait à CHAQUE exécution, sur ces deux chaînes.
+  // Un contrôle qui ne peut pas passer finit par ne plus être lu.
+  // Des prefixes, et non des expressions rationnelles : plus simples a lire,
+  // et impossibles a rendre trop permissives par une echappement de travers.
+  const INERTES = [
+    'http://www.w3.org/',    // espaces de noms XML et SVG
+    'https://leafletjs.com', // attribution obligatoire de Leaflet
+  ];
+  const enDur = (source.match(/['"`]https?:\/\/(?!localhost|192\.168|api\.exemple)[^'"`\s]+/g) ?? [])
+    .map((m) => m.slice(1))
+    .filter((u) => !INERTES.some((inerte) => u.startsWith(inerte)));
+
+  if (enDur.length && !relatif.startsWith('src/api') && !relatif.includes('client.js')) {
     problemes.push(`  RÈGLE    ${relatif} — URL codée en dur : ${enDur[0]}`);
     ko += 1;
   }

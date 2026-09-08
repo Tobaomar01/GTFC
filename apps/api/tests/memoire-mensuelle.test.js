@@ -330,3 +330,123 @@ test('le superviseur lit l\'indicateur, avec ses facteurs', async () => {
       `niveau inconnu : ${ligne.niveau}`);
   }
 });
+
+// ===========================================================================
+//  L'indicateur classe-t-il vraiment ?
+//
+//  Tout ce qui precede eprouve les GARDE-FOUS : le passe ne bouge pas, aucun
+//  niveau sous le minimum, jamais de niveau sans ses facteurs. Rien n'eprouvait
+//  la chose elle-meme — savoir si, avec assez d'historique, elle range les
+//  commercants dans le bon ordre.
+//
+//  Elle ne pouvait pas l'etre sur les donnees de demonstration : un seul mois
+//  y est observe, donc TOUT y est « indetermine ». On fabrique donc trois
+//  historiques, un par comportement, et on regarde ou ils tombent.
+// ===========================================================================
+
+/**
+ * Ecarte les observations reelles d'un commerce le temps du test, sans en
+ * supprimer aucune — le declencheur l'interdit, et c'est le sujet meme de ce
+ * fichier. Marquees remplacees, elles sortent de la vue ; la transaction les
+ * remettra en vigueur.
+ */
+async function isoler(client, commerceId) {
+  await client.query(
+    `UPDATE app.observation_mensuelle
+        SET remplacee_le = now(), motif_remplacement = 'mise a l ecart pour un test'
+      WHERE commerce_id = $1 AND remplacee_le IS NULL`, [commerceId]);
+}
+
+async function poserMois(client, commerce, mois, etat) {
+  await client.query(`
+    INSERT INTO app.observation_mensuelle (
+        commune_id, commerce_id, mois, nb_avis,
+        montant_du_cumule, montant_regle_cumule, montant_restant,
+        montant_regle_mois, nb_paiements_mois, echeance_depassee,
+        dernier_reglement_le, jours_depuis_reglement, nb_avis_relances,
+        contestation_ouverte, exoneration_en_vigueur,
+        nb_visites_mois, commerce_archive)
+    VALUES ($1, $2, $3::date, 1, $4, $5, $6, $7, $8, $9, NULL, $10, $11,
+            false, false, 0, false)`,
+  [commerce.commune_id, commerce.id, mois,
+    etat.du, etat.regleCumule, etat.restant, etat.regleMois,
+    etat.regleMois > 0 ? 1 : 0, etat.echeanceDepassee,
+    etat.joursSansReglement ?? null, etat.relances ?? 0]);
+}
+
+test('avec assez d\'historique, l\'indicateur range les comportements', async () => {
+  const id = await commune();
+
+  await enTransaction(async (client) => {
+    const { rows: commerces } = await client.query(
+      'SELECT id, commune_id FROM app.commerce WHERE commune_id = $1 ORDER BY code LIMIT 3', [id]);
+    assert.equal(commerces.length, 3, 'il faut trois commerces pour ce test');
+
+    const [jamais, interrompu, regulier] = commerces;
+    for (const c of commerces) await isoler(client, c.id);
+
+    // --- Celui qui n'a jamais rien regle, en retard, et deja relance --------
+    // 40 (jamais regle) + 15 (retard habituel) + 5 (relances) = 60
+    for (const mois of ['1998-01-01', '1998-02-01', '1998-03-01']) {
+      await poserMois(client, jamais, mois, {
+        du: 30000, regleCumule: 0, restant: 30000, regleMois: 0,
+        echeanceDepassee: true, relances: 2,
+      });
+    }
+
+    // --- Celui qui a regle, puis s'est arrete -------------------------------
+    // 25 (reglement interrompu). Rien d'autre : il n'est pas en retard au sens
+    // de l'echeance, et un seul mois partiel ne suffit pas.
+    await poserMois(client, interrompu, '1998-01-01', {
+      du: 30000, regleCumule: 10000, restant: 20000, regleMois: 10000,
+      echeanceDepassee: false,
+    });
+    for (const mois of ['1998-02-01', '1998-03-01']) {
+      await poserMois(client, interrompu, mois, {
+        du: 30000, regleCumule: 10000, restant: 20000, regleMois: 0,
+        echeanceDepassee: false, joursSansReglement: 90,
+      });
+    }
+
+    // --- Celui qui solde a temps -------------------------------------------
+    for (const mois of ['1998-01-01', '1998-02-01', '1998-03-01']) {
+      await poserMois(client, regulier, mois, {
+        du: 30000, regleCumule: 30000, restant: 0, regleMois: 10000,
+        echeanceDepassee: false,
+      });
+    }
+
+    const lire = async (commerceId) => {
+      const { rows: [r] } = await client.query(
+        `SELECT niveau, score, nb_mois,
+                (SELECT array_agg(f->>'code' ORDER BY f->>'code')
+                   FROM jsonb_array_elements(facteurs) f) AS codes
+           FROM app.v_risque_defaut WHERE commerce_id = $1`, [commerceId]);
+      return r;
+    };
+
+    const a = await lire(jamais.id);
+    assert.equal(a.nb_mois, 3, 'les trois mois posés ne sont pas tous comptés');
+    assert.deepEqual(a.codes.sort(),
+      ['jamais_regle', 'relances_repetees', 'retard_habituel'],
+      'les facteurs attendus ne sont pas ceux qui sortent');
+    assert.equal(a.score, 60, 'le total ne vaut pas la somme des trois poids');
+    assert.equal(a.niveau, 'eleve',
+      'celui qui n\'a jamais rien réglé, en retard et déjà relancé, n\'est pas '
+      + 'signalé : l\'indicateur ne sert alors à rien');
+
+    const b = await lire(interrompu.id);
+    assert.deepEqual(b.codes, ['reglement_interrompu'],
+      'l\'interruption de paiement n\'est pas reconnue');
+    assert.equal(b.score, 25);
+
+    const c = await lire(regulier.id);
+    assert.equal(c.score, 0,
+      'un commerçant qui solde à temps porte un score : il serait visité pour rien');
+    assert.equal(c.niveau, 'faible');
+
+    // L'ordre est ce qui sert : la feuille de route s'y fie.
+    assert.ok(a.score > b.score && b.score > c.score,
+      'les trois comportements ne sont pas ordonnés du plus grave au plus sain');
+  });
+});

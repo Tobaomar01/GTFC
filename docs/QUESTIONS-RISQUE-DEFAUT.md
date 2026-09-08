@@ -56,13 +56,33 @@ finit par rentrer.
 2.1 Deux mois observés suffisent-ils pour se prononcer ? C'est court. Trois donnerait un
 avis plus sûr, au prix d'un mois de plus avant que l'outil ne serve à quoi que ce soit.
 
-2.3 Soixante jours sans versement valent-ils « interruption » ? Un commerce saisonnier
-peut fermer plus longtemps sans être en difficulté.
-
 2.2 Les deux seuils correspondent-ils à ce que la mairie est en mesure d'absorber ? Un
 seuil bas désigne beaucoup de commerces et sature les tournées ; un seuil haut n'en
 désigne presque aucun. La bonne valeur dépend du nombre d'agents et de la taille des
 tournées, pas d'un principe.
+
+2.3 Soixante jours sans versement valent-ils « interruption » ? Un commerce saisonnier
+peut fermer plus longtemps sans être en difficulté.
+
+2.4 **Un seul facteur isolé franchit le premier seuil.** Mesuré le 08/09/2026 sur les
+valeurs livrées :
+
+| Facteur seul | Poids | Niveau obtenu |
+|---|---|---|
+| Jamais rien réglé | 40 | attention |
+| Règlement interrompu | 25 | *faible* |
+| Retard habituel | 15 | *faible* |
+| Règlement partiel répété | 15 | *faible* |
+| Relances répétées | 5 | *faible* |
+
+Autrement dit, un commerçant qui **réglait puis s'est arrêté depuis trois mois** reste
+classé « faible » et ne remonte jamais — alors que c'est le comportement qui a motivé
+ce dispositif. Il faut choisir : soit le seuil « attention » descend à 25 ou moins, soit
+le poids de l'interruption monte au-dessus de 30. Les deux se valent techniquement ;
+c'est une question de politique de recouvrement, pas de réglage.
+
+Cette conséquence n'a pas été vue en relisant les poids un par un : elle est apparue en
+faisant tourner l'indicateur sur trois historiques fabriqués.
 
 ## 3. Ce qui doit être neutralisé
 
