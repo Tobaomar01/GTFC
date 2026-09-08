@@ -79,8 +79,16 @@ if [[ -f "${DUMP_FILE}.sha256" ]]; then
 else
     warn "Pas de fichier .sha256 associé — intégrité non vérifiable."
 fi
-pg_restore --list "$DUMP_FILE" > /dev/null || fail "Archive illisible."
-NB_OBJETS=$(pg_restore --list "$DUMP_FILE" | grep -cv '^;' || true)
+# DANS LE CONTENEUR, comme la restauration elle-meme quelques lignes plus bas.
+# L'hote porte postgresql-client-16 (install-ubuntu.sh) alors que le serveur
+# tourne en PostgreSQL 17 : le pg_restore de 16 refusait le format 1.16 —
+#     pg_restore: error: unsupported version (1.16) in file header
+# La verification prealable rejetait donc TOUTE sauvegarde valide, et la
+# restauration s'arretait avant d'avoir commence. La commune n'aurait pas pu
+# restaurer, meme en possedant une archive parfaite. Meme defaut que celui
+# corrige dans scripts/backup-postgres.sh.
+LISTE_ARCHIVE="$(docker exec -i "$CONTAINER" pg_restore --list < "$DUMP_FILE" 2>/dev/null)" || fail "Archive illisible."
+NB_OBJETS=$(echo "$LISTE_ARCHIVE" | grep -cv '^;' || true)
 info "Archive lisible — ${NB_OBJETS} objets"
 
 # --- Confirmation -----------------------------------------------------------
@@ -88,7 +96,26 @@ echo
 warn "La base '${DB_NAME}' va être REMPLACÉE par le contenu de :"
 echo "      $(basename "$DUMP_FILE")  ($(date -r "$DUMP_FILE" '+%d/%m/%Y %H:%M'))"
 echo
-read -rp "Tapez exactement le nom de la base pour confirmer (${DB_NAME}) : " confirm
+# SANS TERMINAL, ON REFUSE — et on le DIT.
+#
+# Le « read » rencontrait une fin de fichier, rendait un code non nul, et
+# set -e arretait tout : code 1, aucun message. L'operateur qui lance ce
+# script depuis une tache, un ssh non interactif ou un outil ne voyait RIEN,
+# et pouvait croire la restauration faite. Sur une operation destructive,
+# c'est le pire des silences.
+#
+# Refuser est le bon defaut : une base ne se remplace pas sans que quelqu'un
+# l'ait decide. Qui veut automatiser l'annonce explicitement.
+if [[ -t 0 ]]; then
+    read -rp "Tapez exactement le nom de la base pour confirmer (${DB_NAME}) : " confirm || confirm=""
+elif [[ "${RESTAURATION_CONFIRMEE:-}" == "$DB_NAME" ]]; then
+    confirm="$DB_NAME"
+    warn "Sans terminal : confirmé par RESTAURATION_CONFIRMEE=${DB_NAME}."
+else
+    echo "Refusé : pas de terminal pour confirmer le remplacement de '${DB_NAME}'." >&2
+    echo "Pour le faire depuis un script : RESTAURATION_CONFIRMEE=${DB_NAME} bash scripts/restore-postgres.sh ${DUMP_FILE}" >&2
+    exit 1
+fi
 [[ "$confirm" == "$DB_NAME" ]] || { echo "Annulé."; exit 1; }
 
 # --- Arrêt des services applicatifs ----------------------------------------
