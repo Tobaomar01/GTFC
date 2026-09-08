@@ -98,11 +98,15 @@ router.post('/communes', exigerSuperAdmin,
         `INSERT INTO app.commune_parametre (commune_id, prefixe_code_commerce)
          VALUES ($1, $2)`, [rows[0].id, b.code]);
 
-      // Les 5 taxes sont activées par défaut ; la mairie désactivera celles
-      // qu'elle ne perçoit pas.
+      // On RECOPIE l'état du type, on ne force pas « true ». Un type désactivé
+      // nationalement — la patente, remplacée par la CEL et recouvrée par la
+      // DGID — revenait actif à chaque commune ouverte, ce que la migration 0023
+      // interdisait expressément : « une commune créée demain ne doit pas
+      // pouvoir la réactiver par simple oubli ». La mairie désactivera ensuite
+      // celles qu'elle ne perçoit pas.
       await client.query(`
         INSERT INTO ref.commune_type_taxe (commune_id, type_taxe_id, actif)
-        SELECT $1, id, true FROM ref.type_taxe`, [rows[0].id]);
+        SELECT $1, id, actif FROM ref.type_taxe`, [rows[0].id]);
 
       return rows[0];
     });

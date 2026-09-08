@@ -101,14 +101,17 @@ INSERT INTO app.commune_parametre (
 ON CONFLICT (commune_id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- 3. Activation des 5 taxes pour GTFC
+-- 3. Rattachement des taxes a GTFC
+--
+--    « actif » RECOPIE t.actif au lieu d'etre fixe a true. Un type desactive
+--    nationalement — la patente, remplacee par la CEL et recouvree par la DGID —
+--    ne doit pas revenir actif par le simple fait qu'une commune est ouverte.
+--    C'est exactement ce qui se passait : ce seed la rattachait active, et
+--    annulait la migration 0023.
 -- ---------------------------------------------------------------------------
 INSERT INTO ref.commune_type_taxe (commune_id, type_taxe_id, actif, periodicite, a_remplacer)
-SELECT v_commune_id, t.id, true,
+SELECT v_commune_id, t.id, t.actif,
        CASE t.code
-           -- La facture Wave est mensuelle : la patente annuelle est
-           -- appelée mensuellement par douzième. À confirmer avec la mairie.
-           WHEN 'patente'  THEN 'mensuelle'::app.periodicite
            WHEN 'enseigne' THEN 'mensuelle'::app.periodicite
            ELSE t.periodicite_defaut
        END,

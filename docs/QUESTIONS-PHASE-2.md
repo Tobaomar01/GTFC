@@ -57,7 +57,83 @@ de la TODP, une boutique fermée ne l'est jamais.
 C'est ce qui déterminera les montants réellement facturés. Il me faut, **pour
 chacune des 5 taxes** :
 
+### Ce que la base porte aujourd'hui
+
+Toutes ces valeurs sont **inventées** et marquées `À_REMPLACER` en base.
+
+⚠️ **Attention, et c'est important :** la constitution du projet exige qu'« aucun avis
+NE SOIT émis tant que le barème qui le fonde est provisoire ». **Cette règle n'est pas
+appliquée par le code.** Les données provisoires ne déclenchent qu'un avertissement, et
+chaque ligne d'avis est simplement *marquée* provisoire. La preuve : le jeu de
+démonstration porte 61 avis émis sur ces barèmes inventés.
+
+Autrement dit, rien n'empêche aujourd'hui d'émettre de vrais avis sur de faux montants.
+Le défaut est signalé ; tant qu'il n'est pas corrigé, la prudence ne tient qu'à
+l'exploitant.
+
+| Taxe | Mode de calcul attendu | Tranches à fournir | Fourchette actuelle (inventée) |
+|---|---|---|---|
+| Patente | par catégorie d'activité | 25 | 3 000 → 25 000 XOF |
+| TEOM | par catégorie d'activité | 25 | 2 000 → 5 000 XOF |
+| Droit de place | par jour, par type d'emplacement | 7 | tarif unitaire non renseigné |
+| TODP | au m², par mois | 3 | tarif unitaire non renseigné |
+| Enseignes | au m², par mois | — (tarif unique) | non renseigné |
+
+Les 25 tranches de patente et de TEOM correspondent aux catégories d'activité du §2 :
+**une ligne par catégorie**. Si une catégorie disparaît ou s'ajoute au §2, la grille
+suit.
+
+### La délibération elle-même
+
+Le système ne stocke pas seulement des montants : chaque taxe porte, en base, la
+**référence de la délibération** et sa **date** (`delib_reference`, `delib_date`).
+Les deux sont vides aujourd'hui pour les cinq taxes.
+
+Il faut donc, avec la grille :
+
+- le **numéro et la date** de la délibération du conseil municipal qui fixe ces
+  montants ;
+- sa **date d'entrée en vigueur**, qui peut différer de la date de délibération ;
+- et, si les montants ont déjà changé par le passé, les versions antérieures — la
+  base sait garder l'historique et retrouver le barème applicable à une date donnée.
+
+Sans cette référence, un commerçant qui conteste un montant n'obtiendrait pour toute
+réponse que « c'est ce que dit le logiciel ».
+
+### 3.0 D'ABORD : la patente relève-t-elle de la commune ?
+
+*Cette question précède toutes les suivantes. Y répondre « non » rend le §3.1 sans
+objet, et retire une taxe sur cinq du pilote.*
+
+La spécification se contredit sur ce point, et la contradiction est dans le même
+document :
+
+- **FR-018** : « Le pilote en compte cinq : la **patente** professionnelle, la TEOM,
+  la TODP, le droit de place, la taxe sur les enseignes. »
+- **Hors périmètre de la version pilote** : « Les autres recettes municipales
+  (**patente**, taxe foncière, droits de place sur les marchés couverts, loyers du
+  domaine communal). »
+- Et une clarification antérieure : « La contribution économique locale fait-elle
+  partie du périmètre ? → Non, elle relève de la Direction générale des impôts et
+  des domaines. »
+
+Or la **CEL a remplacé la patente** dans la loi de finances sénégalaise de 2018. Si
+les deux désignent le même prélèvement, alors la patente est exclue deux fois — et
+FR-018 est un reste d'une version antérieure de la spécification.
+
+Ce n'est pas une question de rédaction. **Le système facture aujourd'hui la patente
+sur 61 avis de démonstration sur 61, pour 3 372 500 XOF**, et le barème de patente
+compte 25 tranches à remplir. Si la commune n'est pas fondée à la percevoir, ces
+avis seraient sans base légale.
+
+**Question :** la commune perçoit-elle une patente en son nom propre, distincte de la
+CEL recouvrée par la DGID ? Si oui, sous quelle base légale ? Si non, nous
+désactivons `patente` pour la commune et le pilote passe à quatre taxes.
+
 ### 3.1 Patente professionnelle
+
+*(À traiter seulement si la réponse au §3.0 est « oui ».)*
+
 - Montant fixe, ou variable selon la catégorie / la surface / le chiffre d'affaires ?
 - Grille complète des montants en **XOF**
 - Périodicité : annuelle ? mensuelle ? trimestrielle ?

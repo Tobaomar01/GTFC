@@ -55,3 +55,39 @@ test('le contrôle d\'isolation sait désigner une vue fautive', async () => {
       'le contrôle laisse passer une vue qui contourne manifestement la RLS');
   });
 });
+
+// ===========================================================================
+//  Une taxe qui ne revient pas à la commune ne doit pas être réclamée
+//
+//  La patente a été remplacée en 2018 par la CEL, établie et recouvrée par la
+//  DGID. La migration 0023 l'avait désactivée — sans effet : ref.type_taxe
+//  n'est peuplée que par les seeds, et migrate.sh joue les seeds APRÈS les
+//  migrations. Sur toute base neuve, 0023 mettait à jour zéro ligne, était
+//  consignée comme appliquée, et le seed réinsérait la patente active.
+//
+//  Ce test ne protège pas une ligne de code : il protège l'ORDRE dans lequel
+//  la base se construit. C'est cet ordre qui a rendu la migration inopérante,
+//  et rien dans un fichier SQL ne le laisse voir.
+// ===========================================================================
+
+test('aucune taxe désactivée n\'est réclamée par une commune', async () => {
+  const fautives = await q('SELECT commune, taxe FROM app.v_controle_taxes_desactivees');
+  assert.deepEqual(fautives, [],
+    'une taxe désactivée nationalement est rattachée ACTIVE à une commune : '
+    + 'un agent la réclamerait, et le redevable aurait raison de contester');
+});
+
+test('la patente n\'est plus proposée nulle part', async () => {
+  const [active] = await q(
+    "SELECT actif FROM ref.type_taxe WHERE code = 'patente'");
+  assert.equal(active?.actif, false,
+    'le type « patente » est actif : il a été remplacé par la CEL (DGID) en 2018');
+
+  const rattachee = await q(`
+    SELECT c.slug FROM ref.commune_type_taxe ctt
+      JOIN ref.type_taxe t ON t.id = ctt.type_taxe_id
+      JOIN app.commune   c ON c.id = ctt.commune_id
+     WHERE t.code = 'patente' AND ctt.actif`);
+  assert.deepEqual(rattachee, [],
+    'la patente est active pour au moins une commune');
+});
