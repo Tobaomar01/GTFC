@@ -447,6 +447,48 @@ const composerFeuilles = tache('feuilles-de-route', async () => {
   };
 });
 
+// ---------------------------------------------------------------------------
+// 14. Mémoire mensuelle des situations — le 1er du mois, 04h00
+//
+// Fige, pour chaque commerce facturé, sa situation à la fin du mois écoulé
+// (FR-086). C'est le seul fondement autorisé de l'indicateur de risque : un
+// classement calculé sur l'état courant changerait tout seul dès qu'un avis
+// est annulé ou un versement repris.
+//
+// La fonction repart du PREMIER avis émis et rattrape tout mois qui manque.
+// Un passage sauté — serveur arrêté, migration en cours — se répare donc au
+// suivant, sans intervention et sans trou dans la mémoire.
+//
+// Elle refuse le mois courant : arrêter une situation qui va encore changer
+// n'aurait aucun sens.
+// ---------------------------------------------------------------------------
+const arreterObservations = tache('observations-mensuelles', async () => {
+  const { rows: communes } = await db.requete(CONTEXTE,
+    'SELECT id, code FROM app.commune WHERE actif AND archive_le IS NULL');
+
+  const resultats = {};
+  let moisTotal = 0;
+  let observationsTotal = 0;
+
+  for (const c of communes) {
+    const { rows } = await db.requete(CONTEXTE,
+      'SELECT * FROM app.arreter_observations_dues($1)', [c.id]);
+    resultats[c.code] = {
+      mois_arretes: rows[0].mois_arretes,
+      observations: rows[0].observations,
+    };
+    moisTotal += rows[0].mois_arretes;
+    observationsTotal += rows[0].observations;
+  }
+
+  return {
+    communes: communes.length,
+    mois_arretes: moisTotal,
+    observations: observationsTotal,
+    detail: resultats,
+  };
+});
+
 const taches = [
   ['0 1 25 * *', creerPartitions, 'Création des partitions mensuelles'],
   ['30 1 25 * *', preparerPeriodes, 'Préparation des périodes fiscales'],
@@ -461,6 +503,7 @@ const taches = [
   ['0 * * * *', expirerTransactions, 'Expiration des liens de paiement'],
   ['30 6 * * *', controlerCoherence, 'Contrôle de cohérence quotidien'],
   ['0 5 * * *', composerFeuilles, 'Composition des feuilles de route du jour'],
+  ['0 4 1 * *', arreterObservations, 'Mémoire mensuelle des situations'],
 ];
 
 async function demarrer() {

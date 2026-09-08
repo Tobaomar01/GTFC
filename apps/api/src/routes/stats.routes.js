@@ -134,6 +134,85 @@ router.get('/stats/coherence', exigerRole('superviseur'), asyncHandler(async (re
   });
 }));
 
+/**
+ * Risque de défaut de paiement — FR-089 à FR-092.
+ *
+ * RÉSERVÉ À LA MAIRIE. Cette route n'est pas relayée vers l'application de
+ * terrain : un agent qui lirait « risque élevé » avant d'entrer ne parlerait
+ * pas de la même façon à la personne qu'il visite. Il continue de recevoir un
+ * MOTIF en clair sur sa feuille de route — « paiement interrompu » — qui dit
+ * quoi faire sans porter de jugement.
+ *
+ * Le niveau ne part JAMAIS sans ses facteurs : FR-089 l'interdit, et un
+ * classement qu'on ne peut pas expliquer au commerçant qu'il désigne n'a rien
+ * à faire dans une administration.
+ */
+router.get('/stats/risque-defaut', exigerRole('superviseur'),
+  valider(pagination.extend({
+    niveau: z.enum(['indetermine', 'faible', 'attention', 'eleve']).optional(),
+  }), 'query'),
+  asyncHandler(async (req, res) => {
+    const p = lirePagination(req.query, { defaut: 50, max: 200 });
+    const params = [];
+    let filtre = '';
+    if (req.query.niveau) {
+      params.push(req.query.niveau);
+      filtre = `WHERE r.niveau = $${params.length}`;
+    }
+
+    const { rows: [compte] } = await requete(req.contexte,
+      `SELECT count(*)::int AS total FROM app.v_risque_defaut r ${filtre}`, params);
+
+    const { rows } = await requete(req.contexte, `
+      SELECT r.commerce_id, r.niveau, r.score, r.nb_mois, r.mois_minimaux,
+             r.dernier_mois, r.facteurs,
+             c.code, c.enseigne, c.gerant_nom, c.gerant_prenom,
+             c.adresse_libelle, c.statut_fiscal
+        FROM app.v_risque_defaut r
+        JOIN app.commerce c ON c.id = r.commerce_id
+        ${filtre}
+       ORDER BY CASE r.niveau WHEN 'eleve' THEN 0 WHEN 'attention' THEN 1
+                              WHEN 'faible' THEN 2 ELSE 3 END,
+                r.score DESC, c.enseigne
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, p.limite, p.decalage]);
+
+    return pagine(res, rows, p, compte.total);
+  }));
+
+/**
+ * La mémoire mensuelle d'un commerce : ce sur quoi son niveau est fondé.
+ *
+ * Les observations remplacées sont rendues elles aussi, datées et motivées. Un
+ * chiffre corrigé sans que la correction se voie serait pire que pas de
+ * mémoire du tout.
+ */
+router.get('/stats/observations/:id', exigerRole('superviseur'),
+  valider(z.object({ id: uuid }), 'params'),
+  asyncHandler(async (req, res) => {
+    const { rows } = await requete(req.contexte, `
+      SELECT mois, arretee_le, nb_avis,
+             montant_du_cumule, montant_regle_cumule, montant_restant,
+             montant_regle_mois, nb_paiements_mois,
+             echeance_depassee, dernier_reglement_le, jours_depuis_reglement,
+             nb_avis_relances, contestation_ouverte, exoneration_en_vigueur,
+             nb_visites_mois, commerce_archive,
+             remplacee_le, motif_remplacement
+        FROM app.observation_mensuelle
+       WHERE commerce_id = $1
+       ORDER BY mois DESC, arretee_le DESC`, [req.params.id]);
+
+    const { rows: risque } = await requete(req.contexte,
+      'SELECT niveau, score, nb_mois, mois_minimaux, facteurs FROM app.v_risque_defaut WHERE commerce_id = $1',
+      [req.params.id]);
+
+    return ok(res, {
+      observations: rows,
+      en_vigueur: rows.filter((o) => !o.remplacee_le).length,
+      risque: risque[0] ?? null,
+    });
+  }));
+
 /** Inventaire détaillé des données factices restant à remplacer. */
 router.get('/stats/donnees-a-remplacer', exigerRole('admin_commune'),
   asyncHandler(async (req, res) => {

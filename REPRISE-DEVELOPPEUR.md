@@ -72,7 +72,7 @@ ailleurs (les tirets remplacent les barres obliques).
 Six commandes. Les six doivent passer.
 
 ```bash
-# Installation depuis une base vide, puis les 122 tests
+# Installation depuis une base vide, puis les 135 tests
 bash scripts/verifier-installation-neuve.sh gtfc_epreuve
 
 # Le métier, contre l'API locale (API sur 4000, dashboard sur 3000)
@@ -83,7 +83,7 @@ DB_NAME=gtfc_recette RECETTE_MDP='GtfcDemo2026!' bash scripts/recette.sh
 # la production (gtfc-postgres) — sur un poste de recette, le sien.
 PG_CONTENEUR=gtfc-pg17 bash scripts/repetition-generale.sh gtfc_recette
 
-# Les douze tâches automatiques
+# Les quatorze tâches automatiques
 cd apps/api && DB_NAME=gtfc_recette node src/scheduler.js --une-fois
 
 # Le magasin d'objets se sauvegarde et se restaure à l'identique
@@ -95,7 +95,7 @@ npx eslint@9 --config eslint.defauts.mjs \
   apps/dashboard/src apps/mobile/src apps/mobile/outils
 ```
 
-Plus, avec un navigateur : `cd apps/dashboard && npm test` (18 tests, dont un
+Plus, avec un navigateur : `cd apps/dashboard && npm test` (19 tests, dont un
 ignoré faute de `QR_JETON` — le fournir le fait passer à 18).
 
 Deux d’entre eux demandent un code au portail, qui plafonne les demandes par

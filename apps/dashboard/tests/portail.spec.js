@@ -95,7 +95,15 @@ test('un code faux n\'ouvre pas le dossier', async ({ page }) => {
 test('le dossier ne s\'atteint pas sans session', async ({ page }) => {
   // L'adresse est devinable : elle ne doit pas suffire.
   await page.goto('/portail/dossier');
-  await page.waitForTimeout(1500);
+
+  // La page va chercher la session AVANT de decider. On attend qu'elle ait
+  // tranche, et non un delai fixe : sous charge, 1500 ms la laissaient sur
+  // « Chargement… » et le test echouait sur un rythme, pas sur une faille.
+  //
+  // Rester en chargement pour toujours serait un vrai defaut : ce controle-ci
+  // le dirait alors clairement, au lieu de le deguiser.
+  await expect(page.locator('text=Chargement'))
+    .toHaveCount(0, { timeout: 15000 });
   const corps = await page.locator('body').innerText();
   // Soit on est renvoyé au portail, soit la page refuse — jamais un dossier.
   const renvoye = page.url().includes('/portail') && !page.url().includes('/dossier');
