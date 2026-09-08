@@ -29,10 +29,35 @@ cd "$(dirname "$0")/.."
 BASE="${1:-gtfc_recette}"
 PORT_API="${PORT_API:-4321}"
 PORT_SMS="${PORT_SMS:-4555}"
+PORT_WAVE="${PORT_WAVE:-4556}"
 SECRET_WAVE="secret-de-repetition-generale"
 MDP="${RECETTE_MDP:-GtfcDemo2026!}"
 
 VERT=$'\033[0;32m'; ROUGE=$'\033[0;31m'; GRIS=$'\033[0;90m'; GRAS=$'\033[1m'; NC=$'\033[0m'
+# ---------------------------------------------------------------------------
+#  Accès à PostgreSQL — même convention que scripts/exporter-reversibilite.sh.
+#
+#  Le script appelait « psql » nu, en comptant sur des variables PG* déjà
+#  posées dans l’environnement. Sur un poste où un PostgreSQL local écoute
+#  sur 5432, psql s’y connecte, réclame un mot de passe — et attend sur
+#  l’entrée standard. La répétition restait bloquée à l’étape 3, sans un mot,
+#  aussi longtemps qu’on la laissait tourner.
+# ---------------------------------------------------------------------------
+CONTENEUR="${PG_CONTENEUR:-gtfc-postgres}"
+
+if docker inspect -f '{{.State.Running}}' "$CONTENEUR" 2>/dev/null | grep -q true; then
+  pg() { docker exec -i "$CONTENEUR" psql -U postgres -d "$BASE" -qX "$@"; }
+  VOIE_PG="conteneur ${CONTENEUR}"
+elif command -v psql >/dev/null 2>&1; then
+  # -w : ne demande JAMAIS de mot de passe. Mieux vaut échouer en une seconde
+  # que rester suspendu sans que rien ne le signale.
+  pg() { PGCONNECT_TIMEOUT=5 psql -w -qX -d "$BASE" "$@"; }
+  VOIE_PG="psql natif"
+else
+  echo "[ERREUR] Ni le conteneur ${CONTENEUR} ni psql ne sont disponibles." >&2
+  exit 1
+fi
+
 SUCCES=0; ECHECS=0
 verifier() {
   if [ "$2" = "0" ]; then SUCCES=$((SUCCES+1)); echo "  ${VERT}✓${NC} $1"
@@ -42,16 +67,26 @@ verifier() {
 nettoyer() {
   [ -n "${PID_API:-}" ] && kill "$PID_API" 2>/dev/null
   [ -n "${PID_SMS:-}" ] && kill "$PID_SMS" 2>/dev/null
+  [ -n "${PID_WAVE:-}" ] && kill "$PID_WAVE" 2>/dev/null
 }
 trap nettoyer EXIT
 
 echo
 echo "${GRAS}Répétition générale — configuration de production${NC}"
-echo "${GRIS}base $BASE · API $PORT_API · passerelle SMS factice $PORT_SMS${NC}"
+echo "${GRIS}base $BASE · API $PORT_API · SMS factice $PORT_SMS · Wave factice $PORT_WAVE${NC}"
+echo "${GRIS}PostgreSQL : ${VOIE_PG}${NC}"
 
 # --- La passerelle factice ---------------------------------------------------
 node outils/passerelle-sms-factice.js "$PORT_SMS" > /tmp/repetition-sms.log 2>&1 &
 PID_SMS=$!
+
+# --- La passerelle de paiement factice ---------------------------------------
+# Sans elle, WAVE_ACTIF=true envoyait la campagne vers api.wave.com : soixante
+# et un appels sortants, tous en échec faute de réseau, et un exercice qui se
+# terminait sur cent vingt-deux erreurs ne disant rien du système. L'en-tête
+# promettait pourtant qu'aucun service extérieur n'est touché.
+node outils/passerelle-wave-factice.js "$PORT_WAVE" > /tmp/repetition-wave.log 2>&1 &
+PID_WAVE=$!
 sleep 1
 
 # --- L'API, en production ----------------------------------------------------
@@ -67,7 +102,7 @@ sleep 1
   CORS_ORIGINS="https://gtfc.exemple.sn" \
   SMS_ACTIF=true SMS_FOURNISSEUR=generique \
   SMS_BASE_URL="http://127.0.0.1:${PORT_SMS}/" SMS_API_KEY=factice SMS_EXPEDITEUR=MAIRIE \
-  WAVE_ACTIF=true WAVE_WEBHOOK_SECRET="$SECRET_WAVE" \
+  WAVE_ACTIF=true WAVE_WEBHOOK_SECRET="$SECRET_WAVE" WAVE_API_BASE_URL="http://127.0.0.1:${PORT_WAVE}" WAVE_API_KEY=factice WAVE_SIMULER=false \
   node src/server.js
 ) > /tmp/repetition-api.log 2>&1 &
 PID_API=$!
@@ -105,7 +140,7 @@ echo "${GRAS}3. Code à usage unique${NC}"
 # cinq demandes par heure est une protection voulue : rejouer la répétition
 # plusieurs fois de suite l'atteint, et l'exercice échouerait alors sur un
 # comportement correct.
-TEL_REDEVABLE=$(psql -q "$BASE" -At -c \
+TEL_REDEVABLE=$(pg -At -c \
   "SELECT r.telephone
      FROM app.redevable r
      LEFT JOIN app.code_acces c
@@ -120,7 +155,7 @@ if [ -z "$TEL_REDEVABLE" ]; then
   echo "  ${GRIS}Aucun redevable vérifié sous le quota horaire : étape reportée${NC}"
 fi
 if [ -n "$TEL_REDEVABLE" ]; then
-COMMUNE_SLUG=$(psql -q "$BASE" -At -c "SELECT slug FROM app.commune LIMIT 1")
+COMMUNE_SLUG=$(pg -At -c "SELECT slug FROM app.commune LIMIT 1")
 REPONSE=$(curl -s -m 10 -X POST "$API/portail/code" -H 'content-type: application/json' \
   -d "{\"commune\":\"${COMMUNE_SLUG}\",\"telephone\":\"${TEL_REDEVABLE}\"}")
 echo "$REPONSE" | grep -q 'code_simule'
@@ -139,7 +174,7 @@ echo "${GRAS}4. Campagne mensuelle${NC}"
 # La période qui porte réellement des avis, non la plus récente : une période
 # ouverte mais vide donnerait une campagne sans destinataire, et l'exercice
 # passerait au vert sans avoir rien éprouvé.
-PERIODE=$(psql -q "$BASE" -At -c \
+PERIODE=$(pg -At -c \
   "SELECT p.id FROM app.periode_fiscale p
      JOIN app.avis_imposition a ON a.periode_id = p.id AND a.annule_le IS NULL
     WHERE NOT p.close
@@ -148,7 +183,7 @@ PERIODE=$(psql -q "$BASE" -At -c \
 
 # Les avis doivent être ÉMIS : une campagne sur des brouillons n'envoie rien.
 curl -s -m 60 -X POST "$API/periodes/${PERIODE}/emettre" "${H[@]}" >/dev/null
-NB_EMIS=$(psql -q "$BASE" -At -c \
+NB_EMIS=$(pg -At -c \
   "SELECT count(*) FROM app.avis_imposition WHERE periode_id='${PERIODE}' AND statut IN ('emis','partiellement_paye')")
 [ "${NB_EMIS:-0}" -ge 1 ]
 verifier "Les avis sont émis (${NB_EMIS:-0})" "$?"
@@ -160,7 +195,7 @@ CAMPAGNE=$(curl -s -m 120 -X POST "$API/campagnes/${PERIODE}/lancer" "${H[@]}")
 # seule notification par mois. Au second passage de cette répétition, la file
 # est donc vide, et exiger un envoi ferait échouer l'exercice sur un
 # comportement correct. On mesure ce qu'il y a À ENVOYER avant de conclure.
-EN_FILE=$(psql -q "$BASE" -At -c \
+EN_FILE=$(pg -At -c \
   "SELECT count(*) FROM app.notification WHERE statut = 'en_attente' AND nb_tentatives < 3")
 NOTIFS=$(echo "$CAMPAGNE" | lire "j.donnees?.notifications")
 [ -n "$NOTIFS" ]
@@ -177,7 +212,7 @@ if [ "${EN_FILE:-0}" -gt 0 ]; then
   verifier "Des SMS sortent réellement vers la passerelle (${SORTIS:-0}/${EN_FILE})" "$?" \
     "aucun message n'est parti — c'est le défaut que cette répétition cherche"
 
-  RESTANT=$(psql -q "$BASE" -At -c \
+  RESTANT=$(pg -At -c \
     "SELECT count(*) FROM app.notification WHERE statut IN ('en_attente','echec') AND nb_tentatives > 0")
   [ "${RESTANT:-0}" = "0" ]
   verifier "Aucun message ne reste en échec" "$?" "(${RESTANT:-0} en souffrance)"
@@ -200,7 +235,7 @@ fi
 # --- Le paiement Wave --------------------------------------------------------
 echo
 echo "${GRAS}5. Paiement Wave signé${NC}"
-AVIS=$(psql -q "$BASE" -At -F'|' -c \
+AVIS=$(pg -At -F'|' -c \
   "SELECT a.id, a.commune_id, a.montant_restant FROM app.avis_imposition a
     WHERE a.periode_id='${PERIODE}' AND a.montant_restant > 1000 AND a.annule_le IS NULL LIMIT 1")
 AVIS_ID="${AVIS%%|*}"; RESTE="${AVIS##*|}"
@@ -209,7 +244,7 @@ AVIS_ID="${AVIS%%|*}"; RESTE="${AVIS##*|}"
 # long, et le script cherchait ensuite une référence qui ne correspondait plus
 # à ce qu'il avait posé.
 SESSION="rep$(date +%s)"
-psql -q "$BASE" -c "INSERT INTO app.transaction_wave
+pg -c "INSERT INTO app.transaction_wave
   (commune_id, avis_id, wave_session_id, montant, statut)
   SELECT commune_id, id, '${SESSION}', 1000, 'initiee'
     FROM app.avis_imposition WHERE id='${AVIS_ID}'" >/dev/null
@@ -232,27 +267,27 @@ MAUVAIS=$(curl -s -o /dev/null -w '%{http_code}' -m 15 -X POST "$API/webhooks/wa
 verifier "Une signature invalide est refusée" "$?" "(reçu $MAUVAIS)"
 
 REFERENCE="WAVE-$(echo "$SESSION" | tr '[:lower:]' '[:upper:]')"
-PAYE=$(psql -q "$BASE" -At -c \
+PAYE=$(pg -At -c \
   "SELECT count(*) FROM app.paiement WHERE reference = '${REFERENCE}' AND annule_le IS NULL")
 [ "${PAYE:-0}" = "1" ]
 verifier "Le paiement est enregistré une fois" "$?" "(${PAYE:-0})"
 
-QUITTANCE=$(psql -q "$BASE" -At -c \
+QUITTANCE=$(pg -At -c \
   "SELECT count(*) FROM app.quittance q JOIN app.paiement p ON p.id=q.paiement_id
     WHERE p.reference = '${REFERENCE}'")
 [ "${QUITTANCE:-0}" = "1" ]
 verifier "Une quittance est émise" "$?" "(${QUITTANCE:-0})"
 
 # --- On contre-passe : la répétition ne laisse pas d'argent derrière elle -----
-psql -q "$BASE" -c "UPDATE app.paiement SET annule_le=now(),
+pg -c "UPDATE app.paiement SET annule_le=now(),
   motif_annulation='contre-passation de répétition générale'
   WHERE reference = '${REFERENCE}' AND annule_le IS NULL" >/dev/null
-psql -q "$BASE" -c "DELETE FROM app.transaction_wave WHERE wave_session_id='${SESSION}'" >/dev/null
+pg -c "DELETE FROM app.transaction_wave WHERE wave_session_id='${SESSION}'" >/dev/null
 
 # --- Le journal d'audit a-t-il tenu ? ----------------------------------------
 echo
 echo "${GRAS}6. Après coup${NC}"
-CHAINE=$(psql -q "$BASE" -At -c \
+CHAINE=$(pg -At -c \
   "SELECT coalesce((SELECT rupture_motif FROM audit.verifier_chaine() LIMIT 1),'intacte')")
 [ "$CHAINE" = "intacte" ]
 verifier "La chaîne du journal d'audit est intacte" "$?" "($CHAINE)"

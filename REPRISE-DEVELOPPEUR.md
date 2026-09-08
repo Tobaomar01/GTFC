@@ -78,8 +78,10 @@ bash scripts/verifier-installation-neuve.sh gtfc_epreuve
 # Le métier, contre l'API locale (API sur 4000, dashboard sur 3000)
 DB_NAME=gtfc_recette RECETTE_MDP='GtfcDemo2026!' bash scripts/recette.sh
 
-# La chaîne entière EN CONDITIONS DE PRODUCTION, passerelle SMS factice
-bash scripts/repetition-generale.sh gtfc_recette
+# La chaîne entière EN CONDITIONS DE PRODUCTION, passerelles SMS et Wave
+# factices. PG_CONTENEUR nomme le conteneur PostgreSQL : par défaut celui de
+# la production (gtfc-postgres) — sur un poste de recette, le sien.
+PG_CONTENEUR=gtfc-pg17 bash scripts/repetition-generale.sh gtfc_recette
 
 # Les douze tâches automatiques
 cd apps/api && DB_NAME=gtfc_recette node src/scheduler.js --une-fois
@@ -93,7 +95,12 @@ npx eslint@9 --config eslint.defauts.mjs \
   apps/dashboard/src apps/mobile/src apps/mobile/outils
 ```
 
-Plus, avec un navigateur : `cd apps/dashboard && npm test` (18 tests).
+Plus, avec un navigateur : `cd apps/dashboard && npm test` (18 tests, dont un
+ignoré faute de `QR_JETON` — le fournir le fait passer à 18).
+
+Deux d’entre eux demandent un code au portail, qui plafonne les demandes par
+numéro et par heure : rejouer la suite plusieurs fois d’affilée en ignore un,
+en le disant. Ce n’est pas une panne, c’est la protection qui fonctionne.
 
 ---
 
