@@ -490,7 +490,16 @@ etape_8() {
 etape_9() {
   cd "${RACINE}/apps/dashboard"
 
-  if [[ ! -d node_modules ]]; then
+  # « node_modules existe » ne suffit pas. Une installation faite sous
+  # NODE_ENV=production laisse le dossier en place SANS les devDependencies :
+  # la compilation echoue ensuite sur un outil manquant, et relancer l'etape
+  # ne repare rien puisque le dossier, lui, est bien la. On verifie donc ce
+  # dont la compilation a besoin, pas la presence d'un repertoire.
+  outillage_complet=1
+  for outil in tailwindcss postcss autoprefixer cross-env next; do
+    [[ -e "node_modules/${outil}" ]] || outillage_complet=0
+  done
+  if [[ ! -d node_modules || "$outillage_complet" == "0" ]]; then
     info "npm ci du tableau de bord…"
     # --include=dev EST INDISPENSABLE. Le .env pose NODE_ENV=production, et npm
     # ignore alors les devDependencies MEME sans --omit=dev. Or la compilation du

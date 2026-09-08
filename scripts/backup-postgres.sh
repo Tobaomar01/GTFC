@@ -105,10 +105,19 @@ SIZE_MB=$(du -m "$TARGET" | cut -f1)
 log "Dump terminé — ${SIZE_MB} Mo"
 
 # --- 4. Contrôle d'intégrité ------------------------------------------------
-# pg_restore --list échoue si l'archive est tronquée ou corrompue.
-# On utilise le client installé sur l'hôte (paquet postgresql-client-16).
-pg_restore --list "$TARGET" > /dev/null 2>>"$LOG_FILE" \
-    || fail "L'archive produite est illisible (pg_restore --list a échoué)."
+# pg_restore --list echoue si l'archive est tronquee ou corrompue.
+#
+# DANS LE CONTENEUR, comme le dump. L'hote porte postgresql-client-16
+# (install-ubuntu.sh) alors que docker-compose.yml fait tourner PostgreSQL 17 :
+# le pg_restore de 16 refusait le format 1.16 produit par pg_dump 17 —
+#     pg_restore: error: unsupported version (1.16) in file header
+# CHAQUE sauvegarde nocturne etait declaree corrompue puis effacee, et
+# l'echec s'ecrivait dans cron.log, que personne ne lit tant que rien ne va
+# mal. La commune se serait retrouvee sans aucune sauvegarde.
+#
+# Verifier avec l'outil qui a produit l'archive supprime le couplage : la
+# version du client de l'hote ne peut plus contredire celle du serveur.
+docker exec -i "$CONTAINER" pg_restore --list < "$TARGET" > /dev/null 2>>"$LOG_FILE" || { nettoyer_partiel; fail "L'archive produite est illisible (pg_restore --list a échoué)."; }
 log "Intégrité de l'archive vérifiée"
 
 sha256sum "$TARGET" > "${TARGET}.sha256"

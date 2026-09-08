@@ -85,7 +85,17 @@ crontab -l | sed -n "/${MARKER_START}/,/${MARKER_END}/p"
 
 # --- Première exécution immédiate pour valider ------------------------------
 echo
-read -rp "Lancer une première sauvegarde tout de suite pour vérifier ? [O/n] " r
+# CE SCRIPT EST APPELE SANS TERMINAL par scripts/deployer.sh, avec </dev/null.
+# « read » y rencontrait une fin de fichier, rendait un code non nul, et set -e
+# arretait tout APRES l'installation de la crontab mais AVANT de l'annoncer :
+# l'appelant voyait un echec alors que le travail etait fait, et l'etape 11 du
+# deploiement echouait sur une installation reussie.
+if [[ -t 0 ]]; then
+    read -rp "Lancer une première sauvegarde tout de suite pour vérifier ? [O/n] " r || r=""
+else
+    r="n"
+    info "Entrée non interactive : la sauvegarde de contrôle est laissée à l'appelant."
+fi
 if [[ ! "$r" =~ ^[nN]$ ]]; then
     bash "${ROOT_DIR}/scripts/backup-postgres.sh"
     info "Première sauvegarde effectuée"

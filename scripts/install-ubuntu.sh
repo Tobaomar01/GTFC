@@ -57,8 +57,15 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     ca-certificates curl gnupg lsb-release apt-transport-https software-properties-common \
     git make jq unzip zip htop ncdu tree rsync \
     ufw fail2ban unattended-upgrades needrestart \
+    cron \
     postgresql-client-16 || \
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql-client
+# cron n'est PAS garanti : les images Ubuntu minimales des hebergeurs ne le
+# portent pas, et le deploiement s'arrete alors a l'etape 11 sur un
+# « crontab: command not found » qui ne nomme aucun remede. Les sauvegardes
+# quotidiennes en dependent : c'est au script qui prepare le serveur de le
+# garantir, pas a l'operateur de le deviner.
+systemctl enable --now cron >/dev/null 2>&1 || true
 info "Paquets de base installés"
 
 # ============================================================================

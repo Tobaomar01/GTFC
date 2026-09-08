@@ -93,9 +93,14 @@ head_ "3. Stockage MinIO"
 if docker exec gtfc-minio mc ready local >/dev/null 2>&1; then
     ok "MinIO répond"
     for b in "$MINIO_BUCKET_PHOTOS" "$MINIO_BUCKET_DOCUMENTS" "$MINIO_BUCKET_QRCODES"; do
-        if docker run --rm --network gtfc-net \
-            -e "MC_HOST_g=http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000" \
-            minio/mc:RELEASE.2024-10-08T09-37-26Z ls "g/$b" >/dev/null 2>&1; then
+        # On interroge le conteneur MinIO LUI-MEME, plutot que d'en lancer un neuf
+        # sur le reseau : un conteneur mc neuf depend de la resolution du nom
+        # « minio » par le DNS interne de Docker ET du telechargement d'une image.
+        # Deux dependances de plus pour un controle de sante, qui doit etre la
+        # chose la plus simple du serveur. Sur un Docker imbrique, le resolveur de
+        # mc echouait la ou les compartiments existaient bel et bien : le controle
+        # annoncait un stockage casse alors qu'il allait tres bien.
+        if docker exec -e "MC_HOST_g=http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@127.0.0.1:9000" gtfc-minio mc ls "g/$b" >/dev/null 2>&1; then
             ok "Bucket '$b' accessible"
         else
             ko "Bucket '$b' introuvable"
