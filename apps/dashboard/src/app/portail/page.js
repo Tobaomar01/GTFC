@@ -156,7 +156,11 @@ export default function ConnexionPortail() {
               maxLength={8}
               required
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              // Le bandeau d'erreur disparaît dès qu'on retape. Sinon on lit
+              // « Code invalide » EN SAISISSANT le bon — et sur un téléphone, où le
+              // clavier masque la moitié de l’écran, on croit que le nouveau code
+              // vient d’être refusé lui aussi.
+              onChange={(e) => { setCode(e.target.value.replace(/\D/g, '')); setErreur(null); }}
               placeholder="000000"
               // Chiffres espacés et grande taille : un code se relit à voix
               // haute, souvent depuis une notification, parfois par quelqu'un

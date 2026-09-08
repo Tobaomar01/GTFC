@@ -10,13 +10,35 @@
 const nextConfig = {
   reactStrictMode: true,
 
+  // Les outils de developpement de Next occupent la moitie d'un ecran de
+  // telephone : sur un essai en conditions reelles, le panneau « Static Route »
+  // recouvrait le dossier du redevable pendant son chargement. Ils n'existent
+  // qu'en developpement — les eteindre ne change rien a la production, et rend
+  // les essais sur mobile lisibles.
+  devIndicators: false,
+
+  // Depuis qu'un package-lock.json existe A LA RACINE du depot — pose pour
+  // rendre « npm run defauts » reproductible — Next voit deux fichiers de
+  // verrouillage et DEVINE la racine du projet. Il s'en plaint a chaque
+  // demarrage, et une racine mal devinee change ce qu'il embarque. On la lui
+  // dit, plutot que de le laisser choisir.
+  turbopack: { root: __dirname },
+
   // « next dev » de Next 16 n'autorise que « localhost » comme origine : servi
   // sur 127.0.0.1 — l'adresse employée partout ailleurs dans le projet — il
   // renvoie 403 sur ses propres morceaux de JavaScript. La page s'affiche,
   // mais morte : le formulaire de connexion repart alors en GET natif, et les
   // tests de navigateur attendent une redirection qui ne viendra pas.
   // Option de développement seule : « next start » ne la lit pas.
-  allowedDevOrigins: ["127.0.0.1"],
+  // L'adresse du poste sur le reseau local s'ajoute par DEV_ORIGINES_AUTORISEES
+  // (separees par des virgules). Sans elle, un telephone qui ouvre le portail
+  // recoit 403 sur les morceaux de JavaScript : la page s'affiche, mais MORTE —
+  // exactement le defaut corrige ce matin sur la page de connexion. L'adresse
+  // n'est pas codee en dur : elle change avec le reseau.
+  allowedDevOrigins: [
+    '127.0.0.1',
+    ...(process.env.DEV_ORIGINES_AUTORISEES ?? '').split(',').map((o) => o.trim()).filter(Boolean),
+  ],
 
   // L'application est servie sur le serveur de la commune : on n'expose pas la
   // version de Next dans les en-têtes.
