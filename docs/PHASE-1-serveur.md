@@ -183,7 +183,22 @@ chmod 600 .env
 | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | identifiants admin MinIO |
 | `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` | identifiants applicatifs MinIO |
 | `JWT_SECRET` | secret généré |
-| `CORS_ORIGINS`, `NEXT_PUBLIC_API_URL`, `WAVE_WEBHOOK_URL` | remplacer `A_REMPLIR.sn` par votre domaine |
+| `CORS_ORIGINS`, `WAVE_WEBHOOK_URL` | remplacer `A_REMPLIR.sn` par votre domaine |
+
+`API_URL` reste à `http://127.0.0.1:4000` : le navigateur n'appelle jamais
+l'API directement, chaque page passe par les routes du tableau de bord, qui
+tourne sur la même machine. Y mettre votre domaine ferait ressortir puis
+rentrer le trafic pour rien.
+
+Le modèle et le code se contrôlent l'un l'autre :
+
+```bash
+node scripts/verifier-env-template.js
+```
+
+Il refuse une variable que le modèle demande sans que rien ne la lise, et une
+variable que le code lit sans que le modèle la mentionne. Les deux se paient
+en production, jamais avant.
 
 Ajustez aussi la mémoire PostgreSQL selon la RAM réelle :
 
