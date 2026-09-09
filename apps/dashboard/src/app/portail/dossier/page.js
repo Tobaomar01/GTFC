@@ -37,7 +37,18 @@ const STATUTS = {
   partiel: { texte: 'Paiement partiel', classe: 'bg-st-partiel-fond text-st-partiel' },
   impaye: { texte: 'En retard', classe: 'bg-st-impaye-fond text-st-impaye' },
   exonere: { texte: 'Exonéré', classe: 'bg-st-exonere-fond text-st-exonere' },
+  // « inconnu » recouvre DEUX situations, et le libellé ne peut pas être le
+  // même. app.recalculer_statut_redevable() le rend aussi bien quand aucun avis
+  // n'existe QUE lorsqu'un avis est émis, son échéance à venir, et que rien
+  // n'a encore été versé — délibérément, pour ne pas afficher en rouge
+  // quelqu'un qui n'est en retard de rien.
+  //
+  // Le portail traduisait les deux par « Aucun avis émis ». Sur un téléphone,
+  // le commerçant lisait « Aucun avis émis » au-dessus de « À payer : 85 000
+  // FCFA — avis GTFC-2026-000004 ». Le système se contredisait à l'écran,
+  // devant celui qui doit payer.
   inconnu: { texte: 'Aucun avis émis', classe: 'bg-st-inconnu-fond text-st-inconnu' },
+  en_attente: { texte: 'Échéance à venir', classe: 'bg-st-inconnu-fond text-st-inconnu' },
 };
 
 async function appel(chemin, corps = null) {
@@ -87,7 +98,10 @@ export default function DossierPortail() {
   }
 
   const { redevable, objets, avis, prochaine_echeance: echeance } = dossier;
-  const statut = STATUTS[redevable.statut_fiscal] ?? STATUTS.inconnu;
+  // On ne dit « aucun avis émis » que s'il n'y en a vraiment aucun.
+  const statut = redevable.statut_fiscal === 'inconnu' && (avis?.length ?? 0) > 0
+    ? STATUTS.en_attente
+    : (STATUTS[redevable.statut_fiscal] ?? STATUTS.inconnu);
 
   return (
     <div className="space-y-5">
@@ -131,9 +145,13 @@ export default function DossierPortail() {
         <h2 className="mb-3 text-[15px] font-semibold text-encre">
           Ce qui vous est rattaché
         </h2>
+        {/* La route du portail renvoie objet_type, objet_code, objet_libelle —
+        PAS objet_id. La clé valait donc « undefined » sur CHAQUE ligne, et
+        React le signalait dans la console du navigateur du commerçant.
+        Le couple (type, code) identifie un objet taxable sans ambiguïté. */}
         <ul className="space-y-2">
           {objets.map((o) => (
-            <li key={o.objet_id} className="flex items-start gap-3 border-b border-bordure pb-2 last:border-0 last:pb-0">
+            <li key={`${o.objet_type}-${o.objet_code}`} className="flex items-start gap-3 border-b border-bordure pb-2 last:border-0 last:pb-0">
               <span className="mt-0.5 shrink-0 rounded bg-surface-alt px-1.5 py-0.5 text-[11px] font-medium text-encre-2">
                 {libelleFamille(o.objet_type)}
               </span>
