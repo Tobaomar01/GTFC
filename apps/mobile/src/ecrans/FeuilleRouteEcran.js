@@ -24,7 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { lireReferentiel } from '../bdd/sync.repo';
 import { listerCommerces } from '../bdd/commerces.repo';
-import { Carte, EtatVide, Chargement, useMargeBasse } from '../composants/ui';
+import { Carte, EtatVide, Chargement, Message, useMargeBasse } from '../composants/ui';
 import { couleurs, espacements, typographie, rayons, ombre } from '../theme';
 
 /**
@@ -111,16 +111,47 @@ export function FeuilleRouteEcran({ navigation }) {
 
   const lignes = feuille?.lignes ?? [];
 
+  // DE QUEL JOUR EST CETTE FEUILLE ?
+  //
+  // L'écran disait « aujourd'hui » sur ce qu'il avait en magasin, sans jamais
+  // regarder date_tournee. Un agent qui synchronise lundi soir et part mardi
+  // matin sans réseau parcourait donc la tournée de LUNDI, présentée comme
+  // celle du jour : il repassait chez des commerçants qui ont payé depuis, et
+  // manquait les priorités de la veille au soir.
+  //
+  // On ne cache pas la feuille pour autant — hors réseau, une tournée périmée
+  // vaut mieux que rien. On dit sa date, et on invite à synchroniser.
+  //
+  // Le serveur envoie minuit UTC du jour ouvré ; Dakar est à UTC+0, la partie
+  // date de l'ISO est donc bien le jour local.
+  const jourLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 10);
+  const jourFeuille = feuille?.date_tournee?.slice(0, 10) ?? null;
+  const perimee = Boolean(jourFeuille) && jourFeuille !== jourLocal;
+  const dateLisible = jourFeuille
+    ? new Date(`${jourFeuille}T12:00:00Z`).toLocaleDateString('fr-FR',
+      { weekday: 'long', day: 'numeric', month: 'long' })
+    : null;
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: couleurs.fond }}
       contentContainerStyle={{ padding: espacements.l, paddingBottom: margeBasse }}
       refreshControl={<RefreshControl refreshing={rafraichit} onRefresh={surRafraichir} />}
     >
+      {perimee ? (
+        <Message
+          type="avertissement"
+          titre={`Feuille du ${dateLisible}`}
+          texte="Elle n'a pas été mise à jour aujourd'hui. Synchronisez dès que vous avez du réseau : les commerçants qui ont payé depuis y figurent encore."
+        />
+      ) : null}
+
       {lignes.length === 0 ? (
         <EtatVide
           icone="map-outline"
-          titre="Aucune visite prévue aujourd'hui"
+          titre={perimee ? `Feuille du ${dateLisible} : aucune visite`
+            : "Aucune visite prévue aujourd'hui"}
           texte={feuille
             ? 'Votre feuille est vide : soit tout est à jour dans votre secteur, soit aucun secteur ne vous est affecté. Voyez avec votre superviseur.'
             : 'Synchronisez pour recevoir votre feuille de route.'}
@@ -130,7 +161,7 @@ export function FeuilleRouteEcran({ navigation }) {
           {/* Un repère de journée, pas une note : voir FR-077. */}
           <Text style={[typographie.petit, { marginBottom: espacements.m }]}>
             {lignes.length} visite{lignes.length > 1 ? 's' : ''} prévue
-            {lignes.length > 1 ? 's' : ''} aujourd'hui
+            {lignes.length > 1 ? 's' : ''} {perimee ? `le ${dateLisible}` : "aujourd'hui"}
           </Text>
 
           {lignes.map((l) => {

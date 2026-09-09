@@ -114,6 +114,56 @@ for (const fichier of [...fichiers].sort()) {
     }
   }
 
+  // --- Un composant employé sans être importé ni défini ? -----------------
+  //
+  // Une balise JSX dont le nom ne désigne rien est du JavaScript PARFAITEMENT
+  // valide à l'analyse : c'est une variable, et l'erreur n'arrive qu'au moment
+  // où React tente de rendre `undefined`. Donc seulement quand cette
+  // branche-là s'affiche — la feuille de route périmée, l'écran d'erreur, le
+  // cas qu'on n'a pas rejoué à la main.
+  //
+  // Le cas s'est produit le 09/09/2026 : un <Message> ajouté dans
+  // FeuilleRouteEcran sans toucher à sa ligne d'import.
+  {
+    // Les objets globaux de JavaScript : « a <Math.min(b) » est une
+    // COMPARAISON, pas une balise, et la règle criait dessus. Un contrôle qui
+    // crie faux finit par ne plus être lu.
+    const declares = new Set(['React', 'Fragment',
+      'Math', 'JSON', 'Date', 'Number', 'String', 'Boolean', 'Object', 'Array',
+      'Promise', 'Set', 'Map', 'WeakMap', 'RegExp', 'Error', 'Infinity', 'NaN',
+      'Intl', 'Symbol', 'BigInt']);
+    for (const m of source.matchAll(/import\s+([A-Za-z_$][\w$]*)\s*(?:,|from)/g)) {
+      declares.add(m[1]);
+    }
+    for (const m of source.matchAll(/import\s*\*\s*as\s+([A-Za-z_$][\w$]*)/g)) {
+      declares.add(m[1]);
+    }
+    for (const m of source.matchAll(/import\s*\{([^}]+)\}/g)) {
+      for (const brut of m[1].split(',')) {
+        // « X as Y » : c'est Y qu'on emploie.
+        const nom = brut.trim().split(/\s+as\s+/).pop().trim();
+        if (nom) declares.add(nom);
+      }
+    }
+    for (const m of source.matchAll(/(?:^|\n)\s*(?:export\s+)?(?:async\s+)?function\s+([A-Z][\w$]*)/g)) {
+      declares.add(m[1]);
+    }
+    for (const m of source.matchAll(/(?:^|\n)\s*(?:export\s+)?(?:const|let|var|class)\s+([A-Z][\w$]*)/g)) {
+      declares.add(m[1]);
+    }
+
+    const inconnus = new Set();
+    for (const m of source.matchAll(/<([A-Z][\w$]*)/g)) {
+      // <Onglets.Screen> : seule la racine doit exister.
+      if (!declares.has(m[1])) inconnus.add(m[1]);
+    }
+    for (const nom of inconnus) {
+      problemes.push(`  COMPOSANT  ${relatif} — <${nom}> n'est ni importé ni défini : `
+        + 'la page tombera au moment où cette branche s\'affichera');
+      ko += 1;
+    }
+  }
+
   // Un import d'écran depuis un autre écran crée des cycles difficiles à
   // diagnostiquer sur Metro.
   if (relatif.includes(`ecrans${path.sep}`)) {
