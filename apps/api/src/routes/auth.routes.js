@@ -114,9 +114,14 @@ router.post('/mot-de-passe', authentifier,
       ancien: req.body.ancien_mot_de_passe,
       nouveau: req.body.nouveau_mot_de_passe,
     });
-    // Les autres sessions ont été coupées : l'appelant doit se reconnecter.
+    // TOUTES les sessions sont coupées, y compris celle qui vient d'appeler :
+    // le message disait « vos AUTRES appareils », c'était faux, et l'application
+    // de terrain s'y fiait — l'agent était éjecté un quart d'heure plus tard,
+    // en tournée. Elle se reconnecte désormais aussitôt (ConnexionEcran.js).
     return ok(res, {
-      message: 'Mot de passe modifié. Vos autres appareils ont été déconnectés.',
+      message: 'Mot de passe modifié. Toutes vos sessions ont été fermées, '
+        + 'y compris celle-ci : reconnectez-vous avec le nouveau mot de passe.',
+      reconnexion_requise: true,
     });
   }));
 

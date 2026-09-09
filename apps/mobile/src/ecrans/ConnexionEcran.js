@@ -21,8 +21,19 @@ import { Bouton, Champ, Message } from '../composants/ui';
 import { couleurs, espacements, typographie, rayons } from '../theme';
 import { api, PROBLEME_ADRESSE_API } from '../api/client';
 
+/**
+ * Message à afficher au prochain passage sur l'écran de connexion.
+ *
+ * Les deux écrans de ce fichier ne se voient pas : l'un remplace l'autre dans
+ * la pile. Quand le changement de mot de passe réussit mais que la reconnexion
+ * échoue, l'agent atterrit ici sans savoir pourquoi — et son ancien mot de
+ * passe ne marche plus. Cette variable porte l'explication.
+ */
+let avisConnexion = null;
+
 export function ConnexionEcran() {
   const { connecter, connexionFiable } = useApp();
+  const [avis] = useState(() => { const a = avisConnexion; avisConnexion = null; return a; });
   const [telephone, setTelephone] = useState('');
   const [motDePasse, setMotDePasse] = useState('');
   const [visible, setVisible] = useState(false);
@@ -72,6 +83,10 @@ export function ConnexionEcran() {
           <Text style={styles.titre}>Collecte des taxes locales</Text>
           <Text style={styles.sousTitre}>Application des agents de terrain</Text>
         </View>
+
+        {avis ? (
+          <Message type="succes" titre="Mot de passe modifié" texte={avis} />
+        ) : null}
 
         {/* Dit AVANT la connexion, pas après une journée de recensement
             perdue : un APK sans son adresse de serveur laisse croire à une
@@ -145,7 +160,7 @@ export function ConnexionEcran() {
  * provisoire communiqué à l'oral.
  */
 export function ChangerMotDePasseEcran() {
-  const { marquerMotDePasseChange, deconnecter } = useApp();
+  const { marquerMotDePasseChange, deconnecter, connecter, telephoneConnecte } = useApp();
   const [ancien, setAncien] = useState('');
   const [nouveau, setNouveau] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -166,10 +181,40 @@ export function ChangerMotDePasseEcran() {
     if (nouveau !== confirmation) { setErreur('Les deux mots de passe ne correspondent pas'); return; }
 
     setCharge(true);
+    let change = false;
     try {
       await api.changerMotDePasse(ancien, nouveau);
-      await marquerMotDePasseChange();
+      change = true;
+
+      // Changer de mot de passe révoque TOUTES les sessions du compte, y
+      // compris celle qui vient de le faire — la nôtre. Mesuré le 09/09/2026 :
+      // le jeton de rafraîchissement rendait 401 dès l'instant du changement.
+      //
+      // Sans ce qui suit, l'agent continuait quinze minutes sur son jeton
+      // d'accès, puis se retrouvait éjecté à l'écran de connexion, en pleine
+      // tournée, peut-être sans réseau — et la connexion, elle, EXIGE du
+      // réseau (voir l'en-tête de ce fichier). Sa journée de saisie restait
+      // dans le téléphone, inatteignable jusqu'à retrouver de la couverture.
+      //
+      // On se reconnecte donc immédiatement, tant qu'on sait le réseau
+      // disponible : le changement vient de passer par lui.
+      if (telephoneConnecte) {
+        await connecter(telephoneConnecte, nouveau);
+      } else {
+        // Session d'avant cette correction : le numéro n'y a pas été rangé.
+        await marquerMotDePasseChange();
+      }
     } catch (err) {
+      if (change) {
+        // Le mot de passe EST changé, seule la reconnexion a échoué. Redire
+        // « réessayez » serait un piège : l'ancien mot de passe n'existe plus,
+        // et l'écran le redemande. On renvoie à la connexion en le disant.
+        setErreur(null);
+        avisConnexion = 'Votre nouveau mot de passe est enregistré. La reconnexion '
+          + "automatique n'a pas abouti : connectez-vous avec ce nouveau mot de passe.";
+        await deconnecter({ forcer: true }).catch(() => {});
+        return;
+      }
       setErreur(err.duReseau
         ? 'Réseau indisponible. Le changement de mot de passe nécessite une connexion.'
         : err.message);

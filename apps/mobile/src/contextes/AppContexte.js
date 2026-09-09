@@ -102,12 +102,16 @@ export function FournisseurApp({ children }) {
   // -------------------------------------------------------------------------
   // Session
   // -------------------------------------------------------------------------
-  const enregistrerSession = useCallback(async (donnees) => {
+  const enregistrerSession = useCallback(async (donnees, { telephone } = {}) => {
     const s = {
       jeton_acces: donnees.jeton_acces,
       jeton_rafraichissement: donnees.jeton_rafraichissement,
       utilisateur: donnees.utilisateur,
       doit_changer_mot_de_passe: donnees.doit_changer_mot_de_passe,
+      // Le numéro n'est PAS dans la réponse de /auth/login : on garde celui que
+      // l'agent a saisi. Il sert à se reconnecter juste après un changement de
+      // mot de passe, qui coupe la session en cours (voir ChangerMotDePasseEcran).
+      telephone: telephone ?? sessionRef.current?.telephone ?? null,
       connecte_le: new Date().toISOString(),
     };
     await SecureStore.setItemAsync(CLE_SESSION, JSON.stringify(s));
@@ -132,7 +136,7 @@ export function FournisseurApp({ children }) {
       appareil_modele: `${Device.manufacturer ?? ''} ${Device.modelName ?? ''}`.trim() || undefined,
       version_app: Application.nativeApplicationVersion ?? '1.0.0',
     });
-    const s = await enregistrerSession(donnees);
+    const s = await enregistrerSession(donnees, { telephone });
 
     // Premier chargement : sans référentiels, aucun formulaire n'est saisissable.
     if (!(await referentielsPresents())) {
@@ -221,6 +225,7 @@ export function FournisseurApp({ children }) {
     utilisateur: session?.utilisateur ?? null,
     connecte: Boolean(session),
     doitChangerMotDePasse: session?.doit_changer_mot_de_passe === true,
+    telephoneConnecte: session?.telephone ?? null,
     enLigne,
     connexionFiable,
     donneesChargees,
