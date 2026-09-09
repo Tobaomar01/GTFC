@@ -118,3 +118,59 @@ test('FR-030 — la mécanique de caisse a disparu', async () => {
     'SELECT bool_and(NOT encaissement_especes_autorise) AS ok FROM app.commune_parametre');
   assert.equal(p.ok, true);
 });
+
+/**
+ * Une visite est une MESURE D'ACTIVITÉ, et elle ne se compte qu'une fois.
+ *
+ * Le téléphone remet en file toute opération restée « envoyée » sans réponse,
+ * et tire un identifiant de lot NEUF à chaque tentative : la même visite peut
+ * donc arriver deux fois, dans deux lots que rien ne rapproche. Sans garde-fou
+ * elle s'insérait deux fois et gonflait l'activité déclarée d'un agent.
+ *
+ * POURQUOI ICI, ET PAS SEULEMENT DANS LA MIGRATION 0082.
+ *
+ * Son épreuve interne cherche une commune, un agent et un commerce. Sur une
+ * base NEUVE elle n'en trouve aucun : db/migrate.sh joue les migrations PUIS
+ * les seeds. Elle affiche alors « contrainte non éprouvée ici » et passe — sur
+ * la base construite de zéro, c'est-à-dire exactement celle qu'on déploiera.
+ *
+ * C'est le piège de la migration 0023, sous une autre forme : un contrôle qui
+ * ne s'exécute que là où les données préexistent. Ce test-ci tourne après les
+ * seeds, sur toute base, et ne peut pas être vrai par vacuité.
+ */
+test('FR-051 — une visite renvoyée deux fois ne se compte qu\'une', async () => {
+  const index = await un(`SELECT indexdef FROM pg_indexes
+                           WHERE schemaname = 'app'
+                             AND indexname = 'visite_identifiant_local_unique'`);
+  assert.ok(index, 'la contrainte d\'unicité des visites a disparu');
+  assert.match(index.indexdef, /UNIQUE/,
+    'l\'index existe mais n\'est plus unique : il ne refuse plus rien');
+  assert.match(index.indexdef, /identifiant_local IS NOT NULL/,
+    'l\'index a perdu sa condition : il frapperait les visites saisies au bureau');
+
+  const doubles = await q('SELECT * FROM app.v_controle_visites_en_double');
+  assert.equal(doubles.length, 0,
+    `${doubles.length} visite(s) comptée(s) plusieurs fois : l'activité des agents est surévaluée`);
+
+  // Et la contrainte MORD-elle ? Sans cette moitié, le test passerait sur un
+  // index présent mais inopérant. Tout est annulé en sortant.
+  const refuse2 = await enTransaction(async (client) => {
+    const { rows: [c] } = await client.query('SELECT id FROM app.commune LIMIT 1');
+    const { rows: [u] } = await client.query(
+      'SELECT id FROM app.utilisateur WHERE commune_id = $1 LIMIT 1', [c.id]);
+    const { rows: [co] } = await client.query(
+      'SELECT id FROM app.commerce WHERE commune_id = $1 LIMIT 1', [c.id]);
+
+    const marque = `epreuve-conformite-${Date.now()}`;
+    const inserer = () => client.query(`
+      INSERT INTO app.visite (commune_id, commerce_id, agent_id, resultat,
+                              debute_le, hors_ligne, identifiant_local)
+      VALUES ($1, $2, $3, 'controle', now(), true, $4)`,
+    [c.id, co.id, u.id, marque]);
+
+    await inserer();
+    try { await inserer(); return false; } catch { return true; }
+  });
+  assert.equal(refuse2, true,
+    'la base a accepté la même visite deux fois : la contrainte ne protège rien');
+});
