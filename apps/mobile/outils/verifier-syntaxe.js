@@ -126,6 +126,78 @@ for (const fichier of [...fichiers].sort()) {
 }
 
 // ---------------------------------------------------------------------------
+// Les cibles de navigation existent-elles, et sont-elles atteignables ?
+//
+// CE QUI A ÉTÉ CONSTATÉ le 09/09/2026, sur un vrai téléphone, en terminant un
+// recensement : « The action 'NAVIGATE' with payload {"name":"Accueil"} was
+// not handled by any navigator. » La fiche était enregistrée, mais l'agent
+// restait bloqué sur le formulaire, bandeau rouge en travers de l'écran.
+//
+// La cause : « Accueil » est un ONGLET, déclaré dans le navigateur imbriqué
+// « Principal ». React Navigation remonte vers les PARENTS pour retrouver un
+// nom ; il ne descend jamais dans un navigateur enfant. Depuis un écran de la
+// pile, la seule forme valable est
+//
+//     navigation.navigate('Principal', { screen: 'Accueil' })
+//
+// Rien ne le signalait : ni Babel, ni Metro, ni un test. Le nom est une
+// chaîne, elle est syntaxiquement irréprochable, et l'erreur ne se produit
+// qu'au doigt posé sur le bouton. Deux contrôles, donc — une cible qui
+// n'existe nulle part, et un onglet appelé depuis la pile.
+// ---------------------------------------------------------------------------
+const NAVIGATION = path.join(RACINE, 'src', 'navigation.js');
+if (fs.existsSync(NAVIGATION)) {
+  const nav = fs.readFileSync(NAVIGATION, 'utf8');
+
+  const nomsDeclares = (motif) => new Set(
+    [...nav.matchAll(motif)].map((m) => m[1]),
+  );
+  const onglets = nomsDeclares(/<Onglets\.Screen\s+name="([^"]+)"/g);
+  const pile = nomsDeclares(/<Pile\.Screen\s+name="([^"]+)"/g);
+  const toutes = new Set([...onglets, ...pile]);
+
+  // Les fichiers qui SONT des onglets : eux peuvent nommer un onglet frère
+  // directement, c'est le même navigateur.
+  const composantsOnglets = new Set(
+    [...nav.matchAll(/<Onglets\.Screen\s+name="[^"]+"\s+component=\{(\w+)\}/g)].map((m) => m[1]),
+  );
+  const fichiersOnglets = new Set();
+  for (const m of nav.matchAll(/import\s*\{([^}]+)\}\s*from\s*'(\.[^']+)'/g)) {
+    const noms = m[1].split(',').map((n) => n.trim());
+    if (noms.some((n) => composantsOnglets.has(n))) {
+      fichiersOnglets.add(path.resolve(path.dirname(NAVIGATION), `${m[2]}.js`));
+    }
+  }
+
+  if (toutes.size === 0) {
+    problemes.push('  NAVIGATION  aucun écran déclaré dans src/navigation.js — '
+      + 'le contrôle des cibles ne vérifie plus rien');
+    ko += 1;
+  }
+
+  for (const fichier of [...fichiers].sort()) {
+    if (fichier === NAVIGATION) continue;
+    const relatif = path.relative(RACINE, fichier);
+    const source = fs.readFileSync(fichier, 'utf8');
+
+    // navigate('X') ou replace('X'), sans second argument nommant un écran
+    // imbriqué : c'est cette forme-là qui n'est pas traitée.
+    for (const m of source.matchAll(/\.(navigate|replace)\(\s*'([A-Za-z]\w*)'\s*[,)]/g)) {
+      const cible = m[2];
+      if (!toutes.has(cible)) {
+        problemes.push(`  NAVIGATION  ${relatif} — « ${cible} » n'est déclaré par aucun `
+          + "navigateur : l'action ne sera traitée par personne");
+        ko += 1;
+      } else if (onglets.has(cible) && !pile.has(cible) && !fichiersOnglets.has(fichier)) {
+        problemes.push(`  NAVIGATION  ${relatif} — « ${cible} » est un onglet imbriqué, `
+          + `inatteignable depuis la pile : navigate('Principal', { screen: '${cible}' })`);
+        ko += 1;
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Cohérence des dépendances déclarées
 // ---------------------------------------------------------------------------
 const pkg = JSON.parse(fs.readFileSync(path.join(RACINE, 'package.json'), 'utf8'));

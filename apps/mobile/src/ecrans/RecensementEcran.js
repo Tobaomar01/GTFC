@@ -195,7 +195,13 @@ export function RecensementEcran({ navigation }) {
 
   const terminer = async () => {
     if (connexionFiable) lancerSynchronisation().catch(() => {});
-    navigation.navigate('Accueil');
+    // « Accueil » est un ONGLET, à l'intérieur du navigateur « Principal ».
+    // React Navigation remonte vers les parents pour trouver un nom, il ne
+    // descend PAS dans les navigateurs imbriqués : navigate('Accueil') depuis
+    // la pile n'était traité par personne, et l'agent restait sur le
+    // formulaire avec un bandeau rouge, sa fiche pourtant enregistrée.
+    // Constaté sur un vrai téléphone le 09/09/2026.
+    navigation.navigate('Principal', { screen: 'Accueil' });
   };
 
   if (!referentiels?.categories?.length) {
