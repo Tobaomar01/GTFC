@@ -35,6 +35,7 @@ const AGENT = '+221700000011';
 
 let serveur; let base; let jeton; let point;
 const creations = { commerces: [], redevables: [] };
+const visitesCreees = [];
 
 async function appel(chemin, { methode = 'GET', corps = null, auth = true } = {}) {
   const reponse = await fetch(base + chemin, {
@@ -129,6 +130,12 @@ test.after(async () => {
                 AND NOT EXISTS (SELECT 1 FROM app.avis_imposition a
                                  WHERE a.redevable_id = $1)`, [id]);
   }
+  // Les visites de l'épreuve, elles, se suppriment. Une visite est une MESURE
+  // D'ACTIVITÉ : en laisser derrière soi fausserait exactement ce que ce test
+  // vérifie, et gonflerait le recueil d'activité de l'agent de démonstration.
+  for (const marque of visitesCreees) {
+    await q('DELETE FROM app.visite WHERE identifiant_local = $1', [marque]);
+  }
   await fermer();
   await new Promise((r) => serveur.close(r));
 });
@@ -186,6 +193,63 @@ test('rejouer le même lot ne crée pas de doublon', async () => {
                        WHERE enseigne = $1 AND archive_le IS NULL`,
   [`${MARQUE} Boutique Un`]);
   assert.equal(n.n, 1, 'le rejeu a créé un second commerce');
+});
+
+test('une visite renvoyée dans un AUTRE lot ne se compte pas deux fois', async () => {
+  // Le test précédent rejoue le MÊME lot, que le serveur reconnaît par son
+  // identifiant_client. Ce n'est pas le cas dangereux.
+  //
+  // Le téléphone remet en file toute opération restée « envoyée » sans
+  // réponse — application tuée pendant l'envoi, batterie, Android qui récupère
+  // la mémoire — et il tire un Crypto.randomUUID() NEUF à chaque tentative. La
+  // même visite repart donc dans un lot que rien ne rapproche du premier.
+  //
+  // Quatre entités sur cinq se reconnaissaient par leur identifiant local. La
+  // visite, non : elle s'insérait deux fois et gonflait d'autant l'activité
+  // déclarée de l'agent. Corrigé par la migration 0082 et l'idempotence
+  // ajoutée à traiterVisite.
+  const commerce = await un(`SELECT id FROM app.commerce
+                              WHERE enseigne = $1 AND archive_le IS NULL`,
+  [`${MARQUE} Boutique Un`]);
+  assert.ok(commerce, 'le commerce du parcours doit exister ici');
+
+  const marqueVisite = `${MARQUE}-visite`;
+  const lotDeVisite = () => ({
+    identifiant_client: `test-visite-${Math.random().toString(36).slice(2)}`,
+    appareil_id: 'test-parcours',
+    version_app: '0.0.0-test',
+    operations: [{
+      entite: 'visite',
+      operation: 'creation',
+      identifiant_local: marqueVisite,
+      horodatage_client: new Date().toISOString(),
+      donnees: {
+        commerce_id: commerce.id,
+        resultat: 'controle',
+        commentaire: 'épreuve de doublon',
+        debute_le: new Date().toISOString(),
+        termine_le: new Date().toISOString(),
+      },
+    }],
+  });
+
+  const premier = await appel('/sync/batch', { methode: 'POST', corps: lotDeVisite() });
+  assert.equal(premier.statut, 200, premier.texte);
+  assert.equal(premier.json.donnees.resultats[0].statut, 'traite',
+    JSON.stringify(premier.json.donnees.resultats[0]));
+
+  // Second envoi : lot différent, MÊME identifiant local. C'est la reprise.
+  const second = await appel('/sync/batch', { methode: 'POST', corps: lotDeVisite() });
+  assert.equal(second.statut, 200, second.texte);
+  assert.equal(second.json.donnees.resultats[0].statut, 'traite',
+    'la reprise doit être acceptée, pas rejetée : la visite EST enregistrée');
+
+  visitesCreees.push(marqueVisite);
+
+  const n = await un(`SELECT count(*)::int AS n FROM app.visite
+                       WHERE identifiant_local = $1`, [marqueVisite]);
+  assert.equal(n.n, 1,
+    `la visite a été comptée ${n.n} fois : l'activité de l'agent est surévaluée`);
 });
 
 test('deux boutiques du même numéro n\'ont qu\'un redevable', async () => {

@@ -168,6 +168,34 @@ async function traiterCommerce(client, op, contexte) {
 
 async function traiterVisite(client, op, contexte) {
   const d = op.donnees;
+
+  // Idempotence. Elle manquait ici, et seulement ici : commerce, paiement,
+  // affichage et chantier la portent tous.
+  //
+  // Le téléphone remet en file toute opération restée « envoyée » sans
+  // réponse — application tuée pendant l'envoi, batterie, Android qui récupère
+  // la mémoire — et son commentaire annonce « le serveur est idempotent, un
+  // doublon est sans effet ». Le lot ne protège pas : son identifiant est un
+  // Crypto.randomUUID() tiré à NEUF à chaque tentative, donc deux envois de la
+  // même visite sont deux lots que rien ne rapproche.
+  //
+  // Une visite doublée gonfle l'activité déclarée d'un agent sans que personne
+  // ne puisse le voir. La migration 0082 pose la contrainte correspondante ;
+  // sans la reconnaissance ci-dessous, cette contrainte ferait ÉCHOUER
+  // l'opération et le téléphone la marquerait rejetée alors qu'elle est
+  // parfaitement enregistrée.
+  if (op.identifiant_local) {
+    const { rows: deja } = await client.query(
+      `SELECT id FROM app.visite
+        WHERE commune_id = $1 AND identifiant_local = $2
+        LIMIT 1`,
+      [contexte.communeId, op.identifiant_local],
+    );
+    if (deja[0]) {
+      return { statut: 'traite', entite_id: deja[0].id, message: 'déjà enregistrée' };
+    }
+  }
+
   const { rows } = await client.query(`
     INSERT INTO app.visite (
       commune_id, commerce_id, agent_id, resultat, commentaire,
