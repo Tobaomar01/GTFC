@@ -59,6 +59,12 @@ const PAGES = [
   // Réservée à la mairie (FR-088). Le repère accepte l'état vide : tant que
   // la mémoire est mince, tout est « indéterminé » — et c'est une réponse.
   { chemin: '/accompagnement', porte: /accompagnement|indétermin|commerce/i },
+  // Les routes /sync/conflits existaient depuis le début, réservées au
+  // superviseur, et AUCUNE interface ne les appelait : un conflit de
+  // synchronisation ne pouvait être tranché par personne, et la fiche restait
+  // gelée sur le téléphone de l'agent. Le repère accepte l'état vide — zéro
+  // conflit est le résultat NORMAL — mais pas une page absente ni en erreur.
+  { chemin: '/conflits', porte: /conflit/i },
 ];
 
 /** Pages réservées à l'administrateur de la commune ou au super-admin. */

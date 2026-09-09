@@ -18,6 +18,11 @@ const PAGES = [
   { href: '/contestations', libelle: 'Contestations', icone: '⚖', role: 'superviseur' },
   { href: '/recouvrement', libelle: 'Recouvrement', icone: '◈', role: 'superviseur' },
   { href: '/agents', libelle: 'Agents', icone: '☗', role: 'superviseur' },
+  // Les routes existaient depuis le début, réservées au superviseur, et AUCUNE
+  // interface ne les appelait : un conflit de synchronisation ne pouvait être
+  // tranché par personne, et la fiche restait gelée sur le téléphone de
+  // l'agent. Sans entrée de menu, la page resterait aussi inaccessible.
+  { href: '/conflits', libelle: 'Conflits', icone: '⇄', role: 'superviseur' },
   { href: '/audit', libelle: "Journal d'audit", icone: '⎗', role: 'superviseur' },
   // Réservé à la mairie (FR-088) : l'agent de terrain ne voit pas de niveau,
   // il reçoit un motif de visite en clair.

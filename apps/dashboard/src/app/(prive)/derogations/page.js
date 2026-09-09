@@ -99,7 +99,7 @@ export default function PageDerogations() {
           ['exoneration', 'Exonérations'],
           ['tout', 'Tout le registre'],
         ].map(([cle, libelle]) => (
-          <Bouton key={cle} variante={filtre === cle ? 'principal' : 'secondaire'}
+          <Bouton key={cle} variante={filtre === cle ? 'primaire' : 'secondaire'}
             onClick={() => setFiltre(cle)}>
             {libelle}
           </Bouton>
@@ -110,7 +110,7 @@ export default function PageDerogations() {
         sousTitre="Montants forcés et exonérations — les deux façons d'effacer une dette">
         {decisions.length === 0 ? (
           <EtatVide titre="Aucune décision"
-            description="Rien à afficher pour ce filtre. C'est le résultat attendu : une dérogation doit rester exceptionnelle." />
+            texte="Rien à afficher pour ce filtre. C'est le résultat attendu : une dérogation doit rester exceptionnelle." />
         ) : (
           <Tableau cle="id" lignes={decisions}
             colonnes={[
