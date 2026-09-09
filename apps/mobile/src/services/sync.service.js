@@ -381,16 +381,21 @@ export async function chargementInitial(surProgression = () => {}) {
 // État affiché en permanence dans l'application
 // ---------------------------------------------------------------------------
 export async function etatSynchronisation() {
-  const [enAttente, photos, bloquees, derniere] = await Promise.all([
+  const [enAttente, photos, bloquees, photosBloquees, derniere] = await Promise.all([
     sync.compterEnAttente(),
     sync.compterPhotosEnAttente(),
     sync.operationsBloquees(),
+    sync.photosBloquees(),
     lireMeta('derniere_sync'),
   ]);
 
   return {
     en_attente: enAttente,
     photos_en_attente: photos,
+    // Une photo qui ne partira plus n'est PAS « en attente » : la compter là
+    // empêchait le bandeau de retomber à zéro et rendait la déconnexion
+    // impossible. Elle est à examiner, ce qui n'est pas la même demande.
+    photos_bloquees: photosBloquees.length,
     conflits: bloquees.filter((o) => o.statut === 'conflit').length,
     rejetees: bloquees.filter((o) => o.statut === 'rejetee').length,
     derniere_sync: derniere,

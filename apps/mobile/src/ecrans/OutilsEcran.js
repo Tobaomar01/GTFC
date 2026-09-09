@@ -35,12 +35,14 @@ export function OutilsEcran({ navigation }) {
   const [stats, setStats] = useState(null);
   const [espace, setEspace] = useState(null);
   const [bloquees, setBloquees] = useState([]);
+  const [photosBloquees, setPhotosBloquees] = useState([]);
   const [occupe, setOccupe] = useState(false);
   const [rafraichit, setRafraichit] = useState(false);
 
   const charger = useCallback(async () => {
     setStats(await statistiquesBase());
     setBloquees(await sync.operationsBloquees());
+    setPhotosBloquees(await sync.photosBloquees());
     setEspace(await espaceOccupe().catch(() => null));
   }, []);
 
@@ -65,6 +67,27 @@ export function OutilsEcran({ navigation }) {
   };
 
   const seDeconnecter = async () => {
+    // Une photo bloquée n'empêche PAS la déconnexion : elle ne partira plus,
+    // et refuser indéfiniment enfermerait l'agent dans son compte. Mais elle
+    // est toujours sur le téléphone, et se déconnecter sans le savoir revient
+    // à rendre l'appareil avec la preuve d'un recensement dedans.
+    if (photosBloquees.length > 0) {
+      const suite = await new Promise((resoudre) => {
+        Alert.alert(
+          'Photos non remontées',
+          `${photosBloquees.length} photo(s) sont restées sur ce téléphone et ne `
+          + 'partiront plus toutes seules. Un superviseur doit les récupérer avant '
+          + 'que l\'appareil change de mains.',
+          [
+            { text: 'Annuler', style: 'cancel', onPress: () => resoudre(false) },
+            { text: 'Me déconnecter quand même', onPress: () => resoudre(true) },
+          ],
+          { cancelable: false },
+        );
+      });
+      if (!suite) return;
+    }
+
     try {
       await deconnecter();
     } catch (err) {
@@ -196,6 +219,41 @@ export function OutilsEcran({ navigation }) {
               texte="Les conflits se règlent depuis le tableau de bord de la mairie : un superviseur choisit quelle version conserver."
             />
           ) : null}
+        </Carte>
+      ) : null}
+
+      {/* ------- Photos qui ne partiront plus toutes seules -------
+          Elles n'apparaissaient nulle part : la liste ci-dessus ne lit que la
+          file d'opérations, et le compteur « photos en attente » les comptait
+          sans jamais pouvoir les envoyer. Une photo de devanture est la preuve
+          d'un recensement ; perdue en silence, elle emporte la preuve. */}
+      {photosBloquees.length > 0 ? (
+        <Carte>
+          <Text style={[typographie.sousTitre, { marginBottom: espacements.s }]}>
+            {photosBloquees.length} photo(s) non remontée(s)
+          </Text>
+          {photosBloquees.slice(0, 10).map((p) => (
+            <View key={p.id_local} style={styles.bloquee}>
+              <Ionicons name="image-outline" size={20} color={couleurs.erreur} />
+              <View style={{ flex: 1, marginLeft: espacements.s }}>
+                <Text style={[typographie.corps, { fontWeight: '600' }]} numberOfLines={1}>
+                  {p.enseigne ?? 'Commerce sans enseigne'} — {p.type}
+                </Text>
+                <Text style={typographie.petit} numberOfLines={2}>
+                  {p.cause === 'fiche_bloquee'
+                    ? 'La fiche du commerce n’est pas remontée : réglez-la d’abord, la photo suivra.'
+                    : p.derniere_erreur ?? 'Le serveur a refusé l’envoi.'}
+                </Text>
+                <Text style={[typographie.petit, { fontSize: 12 }]}>
+                  {formaterDate(p.prise_le, { avecHeure: true })}
+                </Text>
+              </View>
+            </View>
+          ))}
+          <Message
+            type="avertissement"
+            texte="Ces photos sont toujours sur le téléphone. Ne le rendez pas et ne videz pas l’application avant qu’un superviseur les ait récupérées."
+          />
         </Carte>
       ) : null}
 

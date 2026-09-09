@@ -11,7 +11,10 @@
     "build:apk": "eas build --platform android --profile preview",
     "build:production": "eas build --platform android --profile production",
     "test:schema": "node outils/verifier-schema.js",
-    "test": "node --test $(find tests -name '*.test.js')"
+    "test": "node --test $(find tests -name '*.test.js')",
+    "test:syntaxe": "node outils/verifier-syntaxe.js",
+    "test:photos": "node --experimental-sqlite outils/epreuve-file-photos.js",
+    "verifier:tout": "npm run test:syntaxe && npm run test:schema && npm run test:photos"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

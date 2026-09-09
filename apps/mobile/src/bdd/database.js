@@ -7,6 +7,9 @@
  * la tournée.
  */
 import * as SQLite from 'expo-sqlite';
+import {
+  SQL_COMPTER_PHOTOS_EN_ATTENTE, SQL_COMPTER_PHOTOS_NON_REMONTEES, TENTATIVES_MAX,
+} from './requetes-photos';
 import { SCHEMA_SQL, MIGRATIONS, VERSION_SCHEMA } from './schema';
 
 const NOM_BASE = 'gtfc-collecte.db';
@@ -137,10 +140,13 @@ export async function purgerJournal() {
 // Diagnostic — écran « Paramètres »
 // ---------------------------------------------------------------------------
 export async function statistiquesBase() {
-  const [commerces, enAttente, photos, visites, conflits] = await Promise.all([
+  const [commerces, enAttente, photos, photosTotal, visites, conflits] = await Promise.all([
     lirePremier('SELECT count(*) AS n FROM commerce'),
     lirePremier("SELECT count(*) AS n FROM operation_sync WHERE statut = 'en_attente'"),
-    lirePremier('SELECT count(*) AS n FROM photo_locale WHERE envoyee = 0'),
+    // Ce qui peut encore partir…
+    lirePremier(SQL_COMPTER_PHOTOS_EN_ATTENTE, [TENTATIVES_MAX, TENTATIVES_MAX]),
+    // …et tout ce qui n'est pas remonté, bloquées comprises.
+    lirePremier(SQL_COMPTER_PHOTOS_NON_REMONTEES),
     lirePremier('SELECT count(*) AS n FROM visite WHERE envoyee = 0'),
     lirePremier("SELECT count(*) AS n FROM operation_sync WHERE statut = 'conflit'"),
   ]);
@@ -149,6 +155,10 @@ export async function statistiquesBase() {
     commerces: commerces?.n ?? 0,
     operations_en_attente: enAttente?.n ?? 0,
     photos_en_attente: photos?.n ?? 0,
+    // DEUX comptes, et les confondre était le défaut. Celui-ci garde la remise
+    // à zéro, qui efface les fichiers : elle doit compter les photos bloquées,
+    // ce sont précisément celles qu'on perdrait pour de bon.
+    photos_non_remontees: photosTotal?.n ?? 0,
     visites_en_attente: visites?.n ?? 0,
     conflits: conflits?.n ?? 0,
     derniere_sync: await lireMeta('derniere_sync'),
@@ -165,7 +175,10 @@ export async function statistiquesBase() {
  */
 export async function reinitialiser({ forcer = false } = {}) {
   const stats = await statistiquesBase();
-  const enAttente = stats.operations_en_attente + stats.photos_en_attente;
+  // Le compte LARGE, ici : la remise à zéro efface les fichiers du téléphone.
+  // Une photo bloquée ne partira plus toute seule, mais elle existe encore et
+  // un superviseur peut la récupérer — jusqu'à ce qu'on l'efface.
+  const enAttente = stats.operations_en_attente + stats.photos_non_remontees;
 
   if (enAttente > 0 && !forcer) {
     const err = new Error(

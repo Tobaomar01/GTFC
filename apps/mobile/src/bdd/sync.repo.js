@@ -8,6 +8,12 @@
  */
 import * as Crypto from 'expo-crypto';
 import { lireTout, lirePremier, executer, transaction } from './database';
+// Ces trois requêtes vivent à part pour pouvoir être ÉPROUVÉES hors téléphone :
+// ce fichier tire expo-sqlite, donc React Native, et ne se charge nulle part
+// ailleurs. Voir outils/epreuve-file-photos.js.
+import {
+  SQL_COMPTER_PHOTOS_EN_ATTENTE, SQL_PHOTOS_BLOQUEES, TENTATIVES_MAX,
+} from './requetes-photos';
 
 const maintenant = () => new Date().toISOString();
 
@@ -16,9 +22,9 @@ const maintenant = () => new Date().toISOString();
  *  qui échoue. */
 export const TAILLE_LOT = 100;
 
-/** Au-delà, on cesse de réessayer automatiquement : l'opération est
- *  probablement invalide et il faut l'avis d'un humain. */
-export const TENTATIVES_MAX = 5;
+/** Réexportée depuis requetes-photos.js, où elle vit désormais pour que
+ *  database.js puisse l'employer sans créer de cycle d'imports. */
+export { TENTATIVES_MAX };
 
 // ---------------------------------------------------------------------------
 // Lecture de la file
@@ -136,10 +142,23 @@ export const photosEnAttente = (limite = 10) => lireTout(`
    WHERE p.envoyee = 0 AND p.tentatives < ? AND c.id_serveur IS NOT NULL
    ORDER BY p.prise_le LIMIT ?`, [TENTATIVES_MAX, limite]);
 
+/**
+ * Photos qui PEUVENT encore partir. Le compte doit porter sur exactement ce que
+ * `photosEnAttente` enverra, sinon le bandeau annonce des envois qui n'auront
+ * jamais lieu — voir requetes-photos.js pour ce que cela coûtait.
+ */
 export const compterPhotosEnAttente = async () => {
-  const l = await lirePremier('SELECT count(*) AS n FROM photo_locale WHERE envoyee = 0');
+  const l = await lirePremier(SQL_COMPTER_PHOTOS_EN_ATTENTE, [TENTATIVES_MAX, TENTATIVES_MAX]);
   return l?.n ?? 0;
 };
+
+/**
+ * Photos qui ne partiront plus toutes seules — voir requetes-photos.js pour le
+ * pourquoi de chaque condition, et outils/epreuve-file-photos.js pour la preuve
+ * qu'elles distinguent bien les cinq situations d'un agent.
+ */
+export const photosBloquees = () => lireTout(
+  SQL_PHOTOS_BLOQUEES, [TENTATIVES_MAX, TENTATIVES_MAX, TENTATIVES_MAX]);
 
 export const photosDuCommerce = (commerceLocal) => lireTout(
   'SELECT * FROM photo_locale WHERE commerce_local = ? ORDER BY prise_le DESC', [commerceLocal],
