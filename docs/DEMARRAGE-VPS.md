@@ -121,9 +121,27 @@ MINIO_SECRET_KEY=…
 CORS_ORIGINS=https://gtfc.votredomaine.com
 ```
 
-Laissez Wave et SMS en simulation : `WAVE_ACTIF=false`, `SMS_ACTIF=false`.
-Toute la chaîne fonctionne, les liens de paiement sont fabriqués localement
-et les codes SMS s'affichent dans le journal du serveur.
+Laissez Wave et SMS en simulation. Pour le SMS, il faut **deux** réglages :
+
+```
+WAVE_ACTIF=false
+SMS_ACTIF=false
+SMS_SIMULER_EN_PROD=true    # <-- indispensable, voir ci-dessous
+```
+
+Toute la chaîne fonctionne ainsi : les liens de paiement sont fabriqués
+localement et les codes à usage unique s'affichent dans le journal du serveur
+au lieu d'être envoyés.
+
+`SMS_SIMULER_EN_PROD` mérite qu'on s'y arrête. Avec `SMS_ACTIF=false` seul,
+**l'API refuse de démarrer en production** — et c'est voulu : sans passerelle,
+le code à usage unique repartirait en clair dans la réponse HTTP, et connaître
+un numéro suffirait à ouvrir le dossier fiscal de son propriétaire. Le second
+réglage est la façon de dire « je sais, et ce serveur ne porte aucune donnée
+réelle ». Il n'a rien à faire sur l'installation de la mairie.
+
+Sans lui, le déploiement s'arrête à l'étape 7 sur ce message — tardivement,
+après avoir installé Docker, PostgreSQL et MinIO.
 
 Puis :
 
