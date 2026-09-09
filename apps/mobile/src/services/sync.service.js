@@ -343,6 +343,26 @@ async function telechargerPaquet() {
     });
   }
 
+  // Les conflits tranchés par la mairie, AVANT la fusion : libérer la fiche
+  // ici lui permet de recevoir les données du serveur dans la même
+  // synchronisation. Après, il faudrait en attendre une seconde.
+  //
+  // Un conflit était sans cela une impasse : l'opération restait « conflit » à
+  // vie, la fiche restait « modifiée localement » donc sautée par la fusion, et
+  // l'agent gardait sous les yeux un solde figé au jour du conflit. La décision
+  // du superviseur, prise et tracée, n'avait aucun effet sur le terrain.
+  let conflitsClotures = 0;
+  for (const c of paquet.conflits_resolus ?? []) {
+    await sync.cloturerConflit(c.identifiant_local, c.resolution, c.message);
+    if (c.entite === 'commerce') {
+      await commerces.libererApresConflit(c.identifiant_local);
+    }
+    conflitsClotures += 1;
+  }
+  if (conflitsClotures > 0) {
+    await journaliser('info', 'Conflits tranchés par la mairie', { nombre: conflitsClotures });
+  }
+
   const resultat = paquet.commerces?.length
     ? await commerces.fusionnerDepuisServeur(paquet.commerces)
     : { inseres: 0, majs: 0, ignores: 0 };

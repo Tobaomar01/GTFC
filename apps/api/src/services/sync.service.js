@@ -608,10 +608,47 @@ async function paquetHorsLigne(contexte, { depuis = null, zoneId = null } = {}) 
       }
     }
 
+    // -----------------------------------------------------------------------
+    //  Les conflits que la mairie a tranchés depuis la dernière réception.
+    //
+    //  Sans cette liste, un conflit était une IMPASSE pour le téléphone. Il
+    //  marquait l'opération « conflit », ne la rejouait plus — ce qui est
+    //  juste, il ne doit rien écraser — et n'avait AUCUN moyen d'apprendre la
+    //  décision du superviseur : le client n'appelle pas /sync/conflits, qui
+    //  est d'ailleurs réservé au rôle superviseur.
+    //
+    //  Trois conséquences, toutes durables. La fiche restait marquée
+    //  « modifiée localement », donc la fusion des données du serveur la
+    //  sautait indéfiniment : l'agent voyait un solde et un statut fiscal figés
+    //  au jour du conflit. La mention « N élément(s) à examiner » ne
+    //  s'éteignait jamais — et un avertissement qui ne s'éteint pas cesse
+    //  d'être lu. Enfin la décision du superviseur, prise et tracée, n'avait
+    //  aucun effet visible sur le terrain.
+    //
+    //  Après résolution, la ligne du SERVEUR fait foi dans les deux cas : si le
+    //  superviseur a donné raison au téléphone, elle porte déjà ses valeurs.
+    //  Le téléphone peut donc lâcher sa version sans rien perdre.
+    // -----------------------------------------------------------------------
+    let conflitsResolus = [];
+    if (contexte.utilisateurId) {
+      const { rows } = await client.query(`
+        SELECT o.identifiant_local, o.entite, o.operation, o.entite_id,
+               o.resolution, o.resolu_le, o.message
+          FROM app.sync_operation o
+          JOIN app.sync_lot l ON l.id = o.lot_id
+         WHERE l.agent_id = $1
+           AND o.resolu_le IS NOT NULL
+           AND o.resolu_le > COALESCE($2::timestamptz, now() - interval '30 days')
+         ORDER BY o.resolu_le
+         LIMIT 200`, [contexte.utilisateurId, depuis]);
+      conflitsResolus = rows;
+    }
+
     return {
       genere_le: new Date().toISOString(),
       delta_depuis: depuis,
       feuille_de_route: feuille,
+      conflits_resolus: conflitsResolus,
       referentiels: {
         categories: categories.rows,
         zones: zones.rows,

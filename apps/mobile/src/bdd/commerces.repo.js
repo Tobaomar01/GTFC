@@ -339,6 +339,22 @@ export const confirmerModification = (idLocal, version) => executer(
   [version, idLocal],
 );
 
+/**
+ * Rend la fiche de nouveau perméable aux données du serveur.
+ *
+ * Appelée quand la mairie a tranché un conflit. Tant que `modifie_localement`
+ * vaut 1, `fusionnerDepuisServeur` saute la fiche — c'est ce qui protège le
+ * travail non remonté de l'agent. Mais après une résolution il n'y a plus rien
+ * à protéger : la décision est prise, et la ligne du serveur porte l'issue.
+ * Laisser le drapeau levé gelait la fiche pour toujours.
+ *
+ * On ne recopie AUCUNE valeur ici : la fusion s'en chargera à la même
+ * synchronisation, avec les données que le serveur vient d'envoyer.
+ */
+export const libererApresConflit = (idLocal) => executer(
+  'UPDATE commerce SET modifie_localement = 0 WHERE id_local = ?', [idLocal],
+);
+
 // ---------------------------------------------------------------------------
 // Visites
 // ---------------------------------------------------------------------------

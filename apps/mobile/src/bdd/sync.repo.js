@@ -93,6 +93,26 @@ export const remettreEnFile = (ids) => (ids.length === 0 ? Promise.resolve() : e
     WHERE id IN (${ids.map(() => '?').join(',')})`, ids,
 ));
 
+/**
+ * Le superviseur a tranché : l'opération sort de l'impasse.
+ *
+ * Un conflit n'était jamais refermé côté téléphone. L'opération restait
+ * « conflit » à vie, la mention « N élément(s) à examiner » ne s'éteignait plus,
+ * et la fiche demeurait marquée « modifiée localement » — donc sautée par la
+ * fusion des données du serveur, avec un solde figé au jour du conflit.
+ *
+ * On marque « confirmee » et non « traitée à part » : dans les deux issues, la
+ * ligne du serveur fait désormais foi. Si le superviseur a donné raison au
+ * téléphone, elle porte déjà ses valeurs.
+ */
+export const cloturerConflit = (identifiantLocal, resolution, message) => executer(
+  `UPDATE operation_sync
+      SET statut = 'confirmee', message = ?, traite_le = ?
+    WHERE identifiant_local = ? AND statut = 'conflit'`,
+  [message ?? `Tranché par la mairie : version ${resolution === 'client' ? 'du téléphone' : 'du bureau'} retenue`,
+    maintenant(), identifiantLocal],
+);
+
 /** Réessayer une opération bloquée, à la demande de l'agent. */
 export const reessayerOperation = (id) => executer(
   `UPDATE operation_sync SET statut = 'en_attente', tentatives = 0, message = NULL WHERE id = ?`,
