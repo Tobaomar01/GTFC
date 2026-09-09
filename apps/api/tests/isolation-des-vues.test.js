@@ -91,3 +91,29 @@ test('la patente n\'est plus proposée nulle part', async () => {
   assert.deepEqual(rattachee, [],
     'la patente est active pour au moins une commune');
 });
+
+// ===========================================================================
+//  Ce que l'application a le droit de lire
+//
+//  Les droits sont accordés UNE FOIS, en migration 0016, par
+//  « GRANT ... ON ALL TABLES IN SCHEMA ». Cela ne vaut que pour ce qui existe
+//  à cet instant : tout objet créé par une migration ultérieure n'est jamais
+//  couvert, sauf si sa propre migration y pense.
+//
+//  Sept ne l'avaient pas fait — dont app.decision_derogatoire, la TABLE des
+//  dérogations. Sur une base neuve, la fonctionnalité entière était
+//  inaccessible à l'application, et six tests tombaient sur
+//  « permission denied ».
+//
+//  Rien ne le signalait : la base de travail, construite au fil des mois,
+//  avait reçu ces droits d'une façon ou d'une autre. Seule une base
+//  RECONSTRUITE montrait le manque — et c'est celle qu'on déploie.
+// ===========================================================================
+
+test('l\'application peut lire tous les objets de app, ref et audit', async () => {
+  const illisibles = await q(
+    'SELECT schema, objet, nature FROM app.v_controle_droits_applicatifs ORDER BY schema, objet');
+  assert.deepEqual(illisibles, [],
+    'des objets sont illisibles par le rôle applicatif : toute page ou route '
+    + 'qui s\'en sert répondra « permission denied » en production');
+});

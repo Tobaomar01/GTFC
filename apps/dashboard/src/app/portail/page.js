@@ -69,6 +69,16 @@ export default function ConnexionPortail() {
       // l'étape suivante dans les deux cas.
       setMessage(r.donnees?.message ?? null);
       setCodeSimule(r.donnees?.code_simule ?? null);
+      // Sans passerelle SMS, la page CONNAIT deja le code : le recopier a la
+      // main n'eprouve rien et fait tout rater. Cinq minutes de validite, un
+      // clavier qui masque le bloc, un bandeau d'erreur d'avant — l'essai sur
+      // telephone a echoue quatre fois de suite pour cette seule raison.
+      //
+      // Le champ se remplit donc tout seul, et UNIQUEMENT dans ce cas :
+      // « code_simule » n'est renvoye que faute d'operateur raccorde, et l'API
+      // REFUSE de demarrer ainsi en production (voir config/env.js). Le jour du
+      // raccordement, ce bloc disparait et le code arrive par SMS.
+      if (r.donnees?.code_simule) setCode(r.donnees.code_simule);
       setEtape('code');
     } catch {
       setErreur('Connexion impossible. Vérifiez votre réseau.');
