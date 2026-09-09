@@ -248,6 +248,17 @@ export function OutilsEcran({ navigation }) {
                   {formaterDate(p.prise_le, { avecHeure: true })}
                 </Text>
               </View>
+              {/* Seulement pour un refus d'envoi : quand c'est la FICHE qui est
+                  bloquée, réessayer la photo ne servirait à rien — c'est
+                  l'opération, listée au-dessus, qu'il faut relancer. */}
+              {p.cause === 'envoi_refuse' ? (
+                <TouchableOpacity
+                  onPress={async () => { await sync.reessayerPhoto(p.id_local); charger(); }}
+                  style={styles.boutonReessayer}
+                >
+                  <Ionicons name="refresh" size={20} color={couleurs.primaire} />
+                </TouchableOpacity>
+              ) : null}
             </View>
           ))}
           <Message

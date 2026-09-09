@@ -119,9 +119,25 @@ export const reessayerOperation = (id) => executer(
   [id],
 );
 
-/** Abandonner une opération définitivement rejetée. L'écran qui appelle
- *  affiche d'abord son contenu : l'agent doit savoir ce qu'il jette. */
-export const abandonnerOperation = (id) => executer('DELETE FROM operation_sync WHERE id = ?', [id]);
+// ABANDONNER UNE OPÉRATION : la fonction a été RETIRÉE, et voici pourquoi.
+//
+// Elle faisait `DELETE FROM operation_sync WHERE id = ?`, et son commentaire
+// annonçait « l'écran qui appelle affiche d'abord son contenu ». Aucun écran ne
+// l'appelait : la promesse ne pouvait pas être tenue, et la fonction attendait
+// que quelqu'un la branche sans voir ce qu'elle laisse derrière elle.
+//
+// Effacer l'opération d'une CRÉATION de commerce ne supprime pas le commerce.
+// Il resterait dans la base du téléphone, marqué « modifié localement », sans
+// aucune opération pour le remonter : une fiche que plus rien ne peut envoyer
+// et que plus rien ne signale. Ses photos, elles, attendraient un identifiant
+// serveur qui ne viendrait jamais — le cas « fiche_bloquee » de photosBloquees.
+//
+// Le besoin, lui, est réel : une opération définitivement rejetée reste dans
+// « à examiner » pour toujours, et c'est le défaut qu'on passe la journée à
+// corriger ailleurs. Mais y répondre demande de décider ce qu'on fait du
+// travail de l'agent — le jeter, le geler, le remonter au superviseur — et
+// cette décision appartient à la mairie, pas à une fonction utilitaire.
+// Question posée dans docs/QUESTIONS-PHASE-2.md.
 
 /** Nettoyage : les opérations confirmées de plus de 7 jours n'ont plus
  *  d'utilité, l'historique complet est côté serveur. */
@@ -191,6 +207,23 @@ export const confirmerPhoto = (idLocal) => executer(
 export const echecPhoto = (idLocal, message) => executer(
   'UPDATE photo_locale SET tentatives = tentatives + 1, derniere_erreur = ? WHERE id_local = ?',
   [String(message).slice(0, 300), idLocal],
+);
+
+/**
+ * Redonner sa chance à une photo que le serveur a refusée cinq fois.
+ *
+ * Les opérations avaient ce bouton depuis toujours ; les photos, non. Une
+ * photo ayant épuisé ses tentatives était donc perdue sans recours, même quand
+ * la cause de l'échec avait disparu — un stockage plein côté serveur, une
+ * coupure pendant l'envoi d'un gros fichier.
+ *
+ * Montrer le problème sans offrir d'issue ne vaut guère mieux que de le taire :
+ * l'agent voit la photo signalée, ne peut rien en faire, et finit par ne plus
+ * regarder l'écran.
+ */
+export const reessayerPhoto = (idLocal) => executer(
+  'UPDATE photo_locale SET tentatives = 0, derniere_erreur = NULL WHERE id_local = ?',
+  [idLocal],
 );
 
 /** Photos confirmées dont le fichier peut être effacé du téléphone.

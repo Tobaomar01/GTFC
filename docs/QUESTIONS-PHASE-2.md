@@ -219,3 +219,39 @@ Si vous ne pouvez répondre qu'à une partie, traitez dans cet ordre :
 Je peux aussi générer le schéma avec des **données factices clairement marquées**
 `À_REMPLACER`, pour que vous puissiez tester l'enchaînement complet pendant que la
 mairie rassemble les documents officiels. Dites-moi si vous préférez cette approche.
+
+---
+
+## Question ouverte — le travail qu'un agent ne peut pas remonter
+
+*Posée le 09/09/2026, en suivant le chemin des opérations rejetées.*
+
+Quand le serveur **rejette définitivement** une opération — une fiche dont les
+données ne passent pas une règle métier, par exemple — le téléphone la garde et
+l'affiche dans « éléments à examiner ». L'agent peut la réessayer, mais si le
+motif du rejet est dans la donnée elle-même, elle échouera toujours.
+
+Cette ligne reste alors affichée **pour toujours**. Or nous avons constaté
+plusieurs fois, sur ce projet, qu'un avertissement qui ne s'éteint jamais cesse
+d'être lu — et emporte avec lui l'attention qu'on aurait dû porter aux autres.
+
+Il existait dans le code une fonction pour effacer l'opération. Elle n'était
+appelée nulle part, et elle a été retirée : effacer l'opération d'une **création**
+de commerce laisserait la fiche dans le téléphone sans rien pour la remonter, et
+ses photos attendraient un identifiant serveur qui ne viendrait jamais.
+
+**La question est une décision de la mairie, pas un choix technique.** Que doit-il
+advenir du travail qu'un agent a produit et que le serveur refuse ?
+
+| Option | Ce que cela veut dire | Conséquence |
+|---|---|---|
+| **A — Remonter au superviseur** | La fiche part quand même, marquée « à corriger », et un agent du bureau la traite | Rien n'est perdu ; charge de travail au bureau |
+| **B — Geler sur le téléphone** | La fiche reste, sort de la liste d'alerte, un export la récupère | Rien n'est perdu ; l'agent doit rendre son téléphone un jour |
+| **C — Jeter, après confirmation** | L'agent supprime fiche, photos et opération en connaissance de cause | Simple ; une journée de terrain peut disparaître sur un geste |
+
+Notre recommandation est **A** : elle est la seule qui respecte le principe
+« aucune écriture ne disparaît », et le rejet vient le plus souvent d'une règle
+que l'agent ne peut pas corriger seul depuis la rue.
+
+Tant que la question n'est pas tranchée, rien n'est effacé — l'élément reste
+affiché, ce qui est le comportement le plus prudent des trois.
