@@ -25,6 +25,7 @@ import { releverPosition } from '../services/localisation';
 import { PriseDePhoto } from '../composants/terrain';
 import {
   Bouton, Champ, Carte, BadgeStatut, Message, Chargement, EtatVide, LigneInfo, Separateur,
+  useMargeBasse,
 } from '../composants/ui';
 import {
   couleurs, espacements, typographie, rayons, formaterXof, formaterDate,
@@ -190,6 +191,8 @@ export function ListeCommercesEcran({ navigation }) {
 //  Fiche
 // ===========================================================================
 export function FicheCommerceEcran({ route, navigation }) {
+  // Sans elle, le dernier bouton se cache sous la barre système d'Android.
+  const margeBasse = useMargeBasse();
   const { idLocal } = route.params;
   const { connexionFiable } = useApp();
 
@@ -254,7 +257,7 @@ export function FicheCommerceEcran({ route, navigation }) {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: couleurs.fond }}
-      contentContainerStyle={{ padding: espacements.l }}
+      contentContainerStyle={{ padding: espacements.l, paddingBottom: margeBasse }}
     >
       <Carte>
         <Text style={typographie.titre}>{commerce.enseigne}</Text>

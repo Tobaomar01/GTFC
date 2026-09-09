@@ -24,7 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { lireReferentiel } from '../bdd/sync.repo';
 import { listerCommerces } from '../bdd/commerces.repo';
-import { Carte, EtatVide, Chargement } from '../composants/ui';
+import { Carte, EtatVide, Chargement, useMargeBasse } from '../composants/ui';
 import { couleurs, espacements, typographie, rayons, ombre } from '../theme';
 
 /**
@@ -80,6 +80,8 @@ const MOTIFS = {
 };
 
 export function FeuilleRouteEcran({ navigation }) {
+  // Sans elle, le dernier bouton se cache sous la barre système d'Android.
+  const margeBasse = useMargeBasse();
   const [feuille, setFeuille] = useState(undefined);
   const [fiches, setFiches] = useState({});
   const [rafraichit, setRafraichit] = useState(false);
@@ -112,7 +114,7 @@ export function FeuilleRouteEcran({ navigation }) {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: couleurs.fond }}
-      contentContainerStyle={{ padding: espacements.l, paddingBottom: espacements.xxl }}
+      contentContainerStyle={{ padding: espacements.l, paddingBottom: margeBasse }}
       refreshControl={<RefreshControl refreshing={rafraichit} onRefresh={surRafraichir} />}
     >
       {lignes.length === 0 ? (

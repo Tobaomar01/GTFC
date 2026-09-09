@@ -34,13 +34,15 @@ import { referentielsComplets, lireReferentiel } from '../bdd/sync.repo';
 import { creerAffichage } from '../bdd/objets.repo';
 import { quartiersParProximite } from '../services/localisation';
 import {
-  Bouton, Champ, Selecteur, Message, Chargement, Separateur,
+  Bouton, Champ, Selecteur, Message, Chargement, Separateur, useMargeBasse,
 } from '../composants/ui';
 import { ReleveurPosition, PriseDePhoto } from '../composants/terrain';
 import { SelecteurRue } from '../composants/rue';
 import { couleurs, espacements, typographie } from '../theme';
 
 export function AffichageEcran({ navigation, route }) {
+  // Sans elle, le dernier bouton se cache sous la barre système d'Android.
+  const margeBasse = useMargeBasse();
   const { lancerSynchronisation, connexionFiable } = useApp();
 
   // Quand l'écran est ouvert depuis une fiche commerce, le support est déjà
@@ -228,7 +230,7 @@ export function AffichageEcran({ navigation, route }) {
     >
       <ScrollView
         style={styles.ecran}
-        contentContainerStyle={styles.contenu}
+        contentContainerStyle={[styles.contenu, { paddingBottom: margeBasse }]}
         keyboardShouldPersistTaps="handled"
       >
         {commerce ? (

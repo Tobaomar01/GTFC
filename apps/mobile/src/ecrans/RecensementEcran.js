@@ -28,13 +28,15 @@ import { referentielsComplets, lireReferentiel } from '../bdd/sync.repo';
 import { creerCommerce, commercesProches, ficheACompleter } from '../bdd/commerces.repo';
 import { quartiersParProximite } from '../services/localisation';
 import {
-  Bouton, Champ, Selecteur, Message, Chargement, Separateur, Carte,
+  Bouton, Champ, Selecteur, Message, Chargement, Separateur, Carte, useMargeBasse,
 } from '../composants/ui';
 import { ReleveurPosition, PriseDePhoto, FormulaireTaxes } from '../composants/terrain';
 import { couleurs, espacements, typographie, STATUTS_COMMERCE } from '../theme';
 
 export function RecensementEcran({ navigation }) {
   const { lancerSynchronisation, connexionFiable } = useApp();
+  // Sans elle, « Terminer » se cache sous la barre de navigation d'Android.
+  const margeBasse = useMargeBasse();
 
   const [referentiels, setReferentiels] = useState(null);
 
@@ -213,7 +215,9 @@ export function RecensementEcran({ navigation }) {
   // -------------------------------------------------------------------------
   if (enregistre) {
     return (
-      <ScrollView style={styles.page} contentContainerStyle={{ padding: espacements.l }}>
+      <ScrollView style={styles.page}
+        contentContainerStyle={{ padding: espacements.l, paddingBottom: margeBasse }}
+      >
         <Message
           type="succes"
           titre="Commerce enregistré sur le téléphone"
@@ -284,7 +288,8 @@ export function RecensementEcran({ navigation }) {
     <KeyboardAvoidingView style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView style={styles.page} contentContainerStyle={{ padding: espacements.l }}
+      <ScrollView style={styles.page}
+        contentContainerStyle={{ padding: espacements.l, paddingBottom: margeBasse }}
         keyboardShouldPersistTaps="handled"
       >
         {/* ---------------- Position ---------------- */}

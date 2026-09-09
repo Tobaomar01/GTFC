@@ -34,7 +34,7 @@ import { referentielsComplets, lireReferentiel } from '../bdd/sync.repo';
 import { creerChantier } from '../bdd/objets.repo';
 import { quartiersParProximite } from '../services/localisation';
 import {
-  Bouton, Champ, Selecteur, Message, Chargement, Separateur,
+  Bouton, Champ, Selecteur, Message, Chargement, Separateur, useMargeBasse,
 } from '../composants/ui';
 import { ReleveurPosition, PriseDePhoto } from '../composants/terrain';
 import { SelecteurRue } from '../composants/rue';
@@ -43,6 +43,8 @@ import {
 } from '../theme';
 
 export function ChantierEcran({ navigation }) {
+  // Sans elle, le dernier bouton se cache sous la barre système d'Android.
+  const margeBasse = useMargeBasse();
   const { lancerSynchronisation, connexionFiable } = useApp();
 
   const [referentiels, setReferentiels] = useState(null);
@@ -190,7 +192,7 @@ export function ChantierEcran({ navigation }) {
     >
       <ScrollView
         style={styles.ecran}
-        contentContainerStyle={styles.contenu}
+        contentContainerStyle={[styles.contenu, { paddingBottom: margeBasse }]}
         keyboardShouldPersistTaps="handled"
       >
         <Message

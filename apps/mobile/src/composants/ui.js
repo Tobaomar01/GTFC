@@ -10,6 +10,7 @@ import {
   View, Text, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   couleurs, espacements, rayons, typographie, ombre, CIBLE_TACTILE, STATUTS_FISCAUX,
 } from '../theme';
@@ -379,3 +380,24 @@ const base = StyleSheet.create({
 });
 
 export { base as stylesUi };
+
+/**
+ * Marge basse d'un écran qui se termine par un bouton.
+ *
+ * CE QUI A ÉTÉ CONSTATÉ le 09/09/2026, sur un vrai téléphone : après un
+ * recensement, les boutons « Terminer » et « Recenser un autre commerce »
+ * passaient SOUS la barre de navigation d'Android. L'agent voyait sa fiche
+ * enregistrée et n'avait aucun moyen de sortir de l'écran.
+ *
+ * Les écrans posaient une marge fixe de 32 px, ou rien du tout. Or la hauteur
+ * de cette barre dépend du téléphone et du mode de navigation choisi — gestes
+ * ou trois boutons — et peut dépasser 48 px. Une constante ne peut pas être
+ * juste partout.
+ *
+ * `SafeAreaProvider` était déjà monté dans App.js, mais aucun écran ne lui
+ * demandait rien. On lui demande enfin.
+ */
+export function useMargeBasse(supplement = espacements.xxl) {
+  const insets = useSafeAreaInsets();
+  return supplement + insets.bottom;
+}
