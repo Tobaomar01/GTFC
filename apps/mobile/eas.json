@@ -15,6 +15,15 @@
         "EXPO_PUBLIC_API_URL": "http://A_REMPLIR_ADRESSE_DU_POSTE:4000"
       }
     },
+    "essai": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.taxes-gtfc.com"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "android": {
