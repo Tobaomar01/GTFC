@@ -199,6 +199,41 @@ const anonymiserScans = tache('scans-publics', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// 5 ter. Purge des accès au portail du redevable — tous les jours, 03h45
+//
+// CE QUI A ÉTÉ CONSTATÉ le 11/09/2026, en rédigeant la politique de
+// confidentialité — c'est-à-dire en écrivant noir sur blanc ce que le logiciel
+// conserve, et en le vérifiant table par table.
+//
+// app.purger_acces_expires() existait dans la base et N'ÉTAIT APPELÉE NULLE
+// PART. Ni ici, ni dans une route, ni dans un script.
+//
+// Ce qu'elle devait nettoyer n'est pas anodin. app.code_acces conserve le
+// NUMÉRO DE TÉLÉPHONE du commerçant et DEUX adresses IP — celle qui a demandé
+// le code, celle qui l'a consommé. app.session_redevable garde une adresse IP
+// et l'agent du navigateur. Sans purge, chaque demande de code jamais faite
+// resterait indéfiniment : un registre des consultations de chaque commerçant,
+// que rien ne justifie de conserver une fois le code expiré.
+//
+// Invisible sur la base de recette : elle a deux jours, aucune ligne n'a
+// encore atteint la fenêtre de trente jours. Le défaut ne se serait manifesté
+// qu'après un mois de production — et sous la forme d'une absence, donc
+// jamais.
+//
+// La rétention est la même que pour les lectures publiques de QR : trente
+// jours, de quoi enquêter sur un accès anormal, pas de quoi constituer un
+// historique.
+// ---------------------------------------------------------------------------
+const purgerAccesPortail = tache('acces-portail', async () => {
+  const { rows } = await db.requete(CONTEXTE,
+    'SELECT * FROM app.purger_acces_expires(30)');
+  return {
+    codes_purges: rows[0].codes_purges,
+    sessions_purgees: rows[0].sessions_purgees,
+  };
+});
+
+// ---------------------------------------------------------------------------
 // 6. Transactions Wave expirées — toutes les heures
 // Un lien de paiement non honoré dans les 24 h est marqué expiré, sinon il
 // resterait indéfiniment « en attente » dans les statistiques.
@@ -500,6 +535,7 @@ const taches = [
   ['*/10 * * * *', genererQuittancesManquantes, 'Génération des quittances PDF'],
   ['0 3 * * 0', purgerSessions, 'Purge des sessions expirées'],
   ['30 3 * * *', anonymiserScans, 'Anonymisation des lectures publiques de QR'],
+  ['45 3 * * *', purgerAccesPortail, 'Purge des accès expirés au portail'],
   ['0 * * * *', expirerTransactions, 'Expiration des liens de paiement'],
   ['30 6 * * *', controlerCoherence, 'Contrôle de cohérence quotidien'],
   ['0 5 * * *', composerFeuilles, 'Composition des feuilles de route du jour'],
