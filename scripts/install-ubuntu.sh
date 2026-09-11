@@ -57,9 +57,38 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     ca-certificates curl gnupg lsb-release apt-transport-https software-properties-common \
     git make jq unzip zip htop ncdu tree rsync \
     ufw fail2ban unattended-upgrades needrestart \
-    cron \
-    postgresql-client-16 || \
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql-client
+    cron
+
+# ---------------------------------------------------------------------------
+#  Le client PostgreSQL, SÉPARÉMENT. Et ce n'est pas une coquetterie.
+#
+#  Il était dans la liste ci-dessus, suivi d'un « || » qui retombait sur
+#  `postgresql-client` si `postgresql-client-16` n'existait pas.
+#
+#  Or apt traite une commande comme UNE SEULE transaction : un paquet
+#  introuvable la fait échouer ENTIÈREMENT. Sur une Ubuntu qui ne livre pas la
+#  version 16 — la 26.04, par exemple, qui est à PostgreSQL 18 — rien ne
+#  s'installait : ni ufw, ni fail2ban, ni cron, ni git, ni jq. Le repli, lui,
+#  n'installait que le client PostgreSQL, et le script continuait comme si de
+#  rien n'était pour s'écrouler trois étapes plus loin sur un pare-feu absent.
+#
+#  Le message d'erreur, à ce moment-là, ne nomme jamais la cause.
+#
+#  On essaie donc la version qui correspond au serveur, puis on accepte celle
+#  que la distribution propose. Le dump et la restauration s'exécutent DANS le
+#  conteneur (voir backup-postgres.sh) : la version de l'hôte ne sert qu'au
+#  diagnostic, elle n'a pas besoin de correspondre.
+# ---------------------------------------------------------------------------
+if DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql-client-17 2>/dev/null; then
+    info "Client PostgreSQL 17 installé"
+elif DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql-client-16 2>/dev/null; then
+    info "Client PostgreSQL 16 installé"
+elif DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql-client 2>/dev/null; then
+    info "Client PostgreSQL $(psql --version 2>/dev/null | awk '{print $3}') installé"
+else
+    warn "Aucun client PostgreSQL installé. Les sauvegardes s'exécutent dans le
+      conteneur et n'en dépendent pas, mais le diagnostic à la main sera limité."
+fi
 # cron n'est PAS garanti : les images Ubuntu minimales des hebergeurs ne le
 # portent pas, et le deploiement s'arrete alors a l'etape 11 sur un
 # « crontab: command not found » qui ne nomme aucun remede. Les sauvegardes
