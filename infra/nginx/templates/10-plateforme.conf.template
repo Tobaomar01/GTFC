@@ -194,9 +194,13 @@ server {
 
     access_log /var/log/nginx/minio-console.access.log main;
 
-    # Décommentez et adaptez pour restreindre la console à l'IP de la mairie :
-    # allow 41.82.0.0/16;
-    # deny  all;
+    # Qui peut atteindre cette console. Le fragment est ENGENDRÉ au déploiement
+    # à partir de CONSOLE_IPS_AUTORISEES dans le .env — voir deployer.sh.
+    #
+    # Il remplace un allow/deny commenté qui n'a jamais été activé : sans lui,
+    # n'importe qui sur Internet peut essayer des mots de passe sur cette page,
+    # et MinIO ne limite pas les tentatives de connexion.
+    include /etc/nginx/snippets/acces-console.conf;
 
     location / {
         proxy_pass http://gtfc_minio_console;

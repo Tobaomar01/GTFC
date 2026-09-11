@@ -114,3 +114,6 @@ apps/dashboard/CLAUDE.md
 /.specify/
 /.claude/
 /REPRISE-specification.md
+
+# Engendré au déploiement depuis CONSOLE_IPS_AUTORISEES (voir deployer.sh)
+infra/nginx/snippets/acces-console.conf

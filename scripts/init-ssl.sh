@@ -177,6 +177,17 @@ fi
 # ============================================================================
 step "4/6  Démarrage de Nginx"
 # ============================================================================
+# Nginx inclut snippets/acces-console.conf, engendré par deployer.sh à partir
+# du .env. Ce script peut être lancé seul, avant lui : on garantit donc que le
+# fichier existe, sinon la configuration est invalide et Nginx refuse de
+# servir. Par défaut il ferme la console — le réglage prudent.
+if [[ ! -f "${ROOT_DIR}/infra/nginx/snippets/acces-console.conf" ]]; then
+    printf '%s\n' \
+        '# Posé par init-ssl.sh faute de mieux. deployer.sh le réécrit depuis le .env.' \
+        'deny all;' > "${ROOT_DIR}/infra/nginx/snippets/acces-console.conf"
+    info "Console du stockage fermée par défaut (deployer.sh appliquera votre réglage)"
+fi
+
 docker compose up -d nginx
 sleep 5
 docker compose exec -T nginx nginx -t \

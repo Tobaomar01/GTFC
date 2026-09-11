@@ -239,6 +239,64 @@ soit pris en compte, puis relancez le script."
 }
 
 # ============================================================================
+#  Qui peut atteindre la console du stockage.
+#
+#  Le fragment est ENGENDRÉ ici plutôt qu'écrit dans le dépôt, parce que la
+#  liste dépend de l'installation : l'adresse de la mairie n'est pas celle du
+#  banc d'essai. Et parce qu'une adresse figée dans un gabarit finit toujours
+#  par enfermer quelqu'un dehors le jour où elle change.
+#
+#  Vide, le fragment refuse TOUT. Ce n'est pas un blocage : la console reste
+#  atteignable par un tunnel SSH, sans rien exposer sur Internet.
+#
+#  Ce qui justifie tout cela : cette console ouvre toutes les photos de tous
+#  les commerces, sans contrôle de rôle ni trace au journal d'audit, et MinIO
+#  ne limite pas les tentatives de connexion. Le gabarit portait un allow/deny
+#  en commentaire depuis le début — une intention jamais activée.
+# ============================================================================
+ecrire_acces_console() {
+  local fichier="${RACINE}/infra/nginx/snippets/acces-console.conf"
+  local liste="${CONSOLE_IPS_AUTORISEES:-}"
+  local lignes=() adresses=0
+
+  lignes+=("# ENGENDRÉ par scripts/deployer.sh — ne pas modifier à la main.")
+  lignes+=("# La source est CONSOLE_IPS_AUTORISEES dans le .env.")
+
+  if [[ -z "$liste" ]]; then
+    lignes+=("# Liste vide : la console n'est ouverte à personne depuis Internet.")
+    lignes+=("# Tunnel SSH :  ssh -L 9001:127.0.0.1:9001 <compte>@<serveur>")
+  else
+    local ancienIFS="$IFS"; IFS=','
+    for adresse in $liste; do
+      adresse="$(echo "$adresse" | tr -d '[:space:]')"
+      [[ -z "$adresse" ]] && continue
+      lignes+=("allow ${adresse};")
+      adresses=$((adresses + 1))
+    done
+    IFS="$ancienIFS"
+  fi
+  lignes+=("deny all;")
+
+  # ON N'ÉCRIT RIEN D'AUTRE QUE DES DIRECTIVES DANS CE FICHIER.
+  #
+  # Ma première version appelait `info` À L'INTÉRIEUR du bloc redirigé : le
+  # message destiné à l'écran atterrissait dans la configuration de Nginx, qui
+  # refusait alors de démarrer et redémarrait en boucle. Constaté sur-le-champ,
+  # le 11/09/2026.
+  #
+  # La leçon est générale : une fonction qui ÉCRIT UN FICHIER ne doit rien
+  # afficher tant que la redirection est ouverte. On compose d'abord, on écrit
+  # ensuite, on parle en dernier.
+  printf '%s\n' "${lignes[@]}" > "$fichier"
+
+  if [[ "$adresses" -gt 0 ]]; then
+    info "Console du stockage ouverte à ${adresses} adresse(s)"
+  else
+    info "Console du stockage fermée à Internet (tunnel SSH pour y accéder)"
+  fi
+}
+
+# ============================================================================
 #  2. Fichier .env
 # ============================================================================
 etape_2() {
@@ -390,6 +448,10 @@ Pour tester sans consommer le quota : LETSENCRYPT_STAGING=1 dans le .env"
 # ============================================================================
 etape_5() {
   charger_env
+
+  # AVANT de démarrer Nginx : le fragment qu'il inclut doit exister, sinon sa
+  # configuration est invalide et le conteneur refuse de servir.
+  ecrire_acces_console
 
   info "Démarrage des conteneurs…"
   executer docker compose up -d
