@@ -148,6 +148,24 @@ services:
       - ./infra/certbot/conf:/etc/letsencrypt
       - ./infra/certbot/www:/var/www/certbot
       - nginx-cache:/var/cache/nginx
+    # Le dossier où l'image ÉCRIT les configurations engendrées à partir des
+    # gabarits. Il n'existe pas dans nginx:alpine, et rien ne le créait :
+    #
+    #   20-envsubst-on-templates.sh: ERROR: /etc/nginx/templates exists,
+    #                                mais /etc/nginx/sites n'est pas accessible
+    #
+    # Aucun fichier de site n'était alors produit, l'include de nginx.conf ne
+    # trouvait rien, et nginx n'écoutait sur aucun port. Le conteneur restait
+    # « Up » — c'est ce qui rend le défaut si discret : docker ps le dit en
+    # bonne santé, et seule une requête révèle qu'il ne sert rien.
+    #
+    # En mémoire plutôt qu'en volume : ce contenu est ENGENDRÉ à chaque
+    # démarrage, à partir des gabarits et du .env. Le persister ferait survivre
+    # une configuration périmée à un changement de domaine.
+    #
+    # Constaté le 11/09/2026, au premier déploiement réel.
+    tmpfs:
+      - /etc/nginx/sites
     ports:
       - "80:80"
       - "443:443"
