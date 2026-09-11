@@ -57,9 +57,27 @@ Créez trois enregistrements **A** pointant vers l'IP du VPS :
 
 | Nom | Type | Valeur |
 |---|---|---|
+| `votredomaine.com` (racine, noté `@`) | A | l'IP du VPS |
+| `www.votredomaine.com` | A | l'IP du VPS |
 | `api.votredomaine.com` | A | l'IP du VPS |
-| `gtfc.votredomaine.com` | A | l'IP du VPS |
+| `s3.votredomaine.com` | A | l'IP du VPS |
+| `console.votredomaine.com` | A | l'IP du VPS |
 | `portail.votredomaine.com` | A | l'IP du VPS |
+| `gtfc.votredomaine.com` | A | l'IP du VPS |
+
+**Les SEPT, sans exception.** Ce document en annonçait trois, et le premier
+déploiement réel s'est arrêté là-dessus le 11/09/2026.
+
+Let's Encrypt valide chaque nom séparément et **refuse le certificat entier si
+un seul ne résout pas**. Il ne s'agit donc pas de confort : sans ces sept
+enregistrements, il n'y a pas de HTTPS, et sans HTTPS il n'y a ni portail ni
+paiement.
+
+La racine et `www` pointent souvent déjà vers la page d'attente du registrar :
+il faut les **modifier**, pas seulement ajouter les autres.
+
+La liste fait foi dans `scripts/sous-domaines.sh`, que le déploiement et
+l'obtention des certificats lisent tous les deux.
 
 La propagation prend de quelques minutes à deux heures. Vérifiez avant de
 continuer :

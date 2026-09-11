@@ -264,8 +264,15 @@ etape_3() {
   [[ -n "$ipPublique" ]] && ok "IP publique du serveur : $ipPublique" \
     || avertir "IP publique indéterminée (pas de connexion sortante ?)"
 
-  local noms=("${APP_DOMAIN}" "api.${APP_DOMAIN}" "gtfc.${APP_DOMAIN}"
-              "s3.${APP_DOMAIN}" "console.${APP_DOMAIN}" "www.${APP_DOMAIN}")
+  # La liste vient de scripts/sous-domaines.sh, que init-ssl.sh lit aussi.
+  # Elle y vivait en double, et les deux copies avaient divergé : « portail »
+  # manquait ici. Let's Encrypt valide les noms un par un et refuse le
+  # certificat entier si un seul ne résout pas — le contrôle passait donc au
+  # vert sur une zone incomplète, et la panne tombait une étape plus loin.
+  local noms
+  source "${RACINE}/scripts/sous-domaines.sh"
+  noms=("${DOMAINS[@]}")
+
   local kos=0
   for n in "${noms[@]}"; do
     local resolu

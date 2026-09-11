@@ -142,7 +142,13 @@ statique fournie par Sonatel :
 | `api` | A | `<IP statique>` |
 | `s3` | A | `<IP statique>` |
 | `console` | A | `<IP statique>` |
+| `portail` | A | `<IP statique>` |
 | `gtfc` | A | `<IP statique>` |
+
+**Les sept, sans exception.** `portail` manquait dans ce tableau ; Let's Encrypt
+valide chaque nom séparément et refuse le certificat ENTIER si un seul ne
+résout pas. La liste fait foi dans `scripts/sous-domaines.sh`, que le
+déploiement et l'obtention des certificats lisent tous les deux.
 
 Sur votre box/routeur Sonatel, redirigez les ports **80** et **443** vers l'IP
 locale du serveur.
@@ -150,7 +156,7 @@ locale du serveur.
 Attendez la propagation (15 min à 24 h), puis vérifiez depuis le serveur :
 
 ```bash
-for s in "" www. api. s3. console. gtfc.; do
+for s in "" www. api. s3. console. portail. gtfc.; do
   echo -n "$s VOTRE-DOMAINE -> "; dig +short "${s}VOTRE-DOMAINE"
 done
 curl -s https://api.ipify.org    # doit afficher la même IP

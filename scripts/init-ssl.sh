@@ -63,28 +63,10 @@ set -a; source .env; set +a
 [[ -n "${LETSENCRYPT_EMAIL:-}" && "$LETSENCRYPT_EMAIL" != "A_REMPLIR@example.com" ]] \
     || fail "LETSENCRYPT_EMAIL n'est pas renseigné dans .env"
 
-# Liste des noms couverts par le certificat.
-# Pour ajouter une commune plus tard : scripts/add-commune-domain.sh <slug>
-DOMAINS=(
-    "${APP_DOMAIN}"
-    "www.${APP_DOMAIN}"
-    "api.${APP_DOMAIN}"
-    "s3.${APP_DOMAIN}"
-    "console.${APP_DOMAIN}"
-    "portail.${APP_DOMAIN}"
-    "gtfc.${APP_DOMAIN}"
-)
-
-# Sous-domaines des communes ajoutées après coup
-# (un slug par ligne, alimenté par scripts/add-commune-domain.sh)
-EXTRA_FILE="${ROOT_DIR}/infra/certbot/communes.txt"
-if [[ -f "$EXTRA_FILE" ]]; then
-    while read -r slug; do
-        [[ -z "$slug" || "$slug" == \#* ]] && continue
-        [[ "$slug" == "gtfc" ]] && continue      # déjà présent
-        DOMAINS+=("${slug}.${APP_DOMAIN}")
-    done < "$EXTRA_FILE"
-fi
+# Les noms couverts par le certificat viennent de scripts/sous-domaines.sh,
+# que deployer.sh lit aussi : les deux listes ne peuvent plus diverger.
+# Pour ajouter une commune : scripts/add-commune-domain.sh <slug>
+source "${ROOT_DIR}/scripts/sous-domaines.sh"
 
 CERT_DIR="${ROOT_DIR}/infra/certbot/conf"
 WEBROOT="${ROOT_DIR}/infra/certbot/www"
