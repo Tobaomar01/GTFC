@@ -195,6 +195,47 @@ soit pris en compte, puis relancez le script."
   ok "Docker $(docker --version | awk '{print $3}' | tr -d ,)"
   ok "Node.js $(node -v)  ·  PM2 $(pm2 -v)"
   ok "Docker utilisable sans sudo"
+
+  # --------------------------------------------------------------------------
+  #  Laisser Nginx joindre l'API et le tableau de bord.
+  #
+  #  CE QUI A ÉTÉ CONSTATÉ le 11/09/2026, au premier déploiement réel : tous
+  #  les services démarraient, PM2 les déclarait « online », l'API répondait
+  #  200 sur l'hôte — et le site entier rendait 504.
+  #
+  #  Nginx tourne dans un CONTENEUR et joint l'hôte par host.docker.internal,
+  #  c'est-à-dire la passerelle du pont Docker (172.17.0.1). Deux choses l'en
+  #  empêchaient, et lever une seule n'aurait rien changé :
+  #
+  #    · l'API n'écoutait que sur 127.0.0.1 — la boucle locale de l'hôte, que
+  #      le conteneur ne peut pas atteindre. Corrigé dans .env.template ;
+  #    · ufw, en « deny (incoming) », rejetait le trafic venu des conteneurs.
+  #      Trente paquets bloqués en dix minutes, sans qu'aucun journal applicatif
+  #      ne le mentionne : côté Nginx cela ressemble à un backend muet.
+  #
+  #  La règle ci-dessous n'ouvre RIEN sur Internet : elle n'autorise que les
+  #  adresses privées du pont Docker, et 4000 comme 3000 restent fermés au
+  #  monde extérieur par la politique par défaut.
+  # --------------------------------------------------------------------------
+  if command -v ufw >/dev/null 2>&1 && sudo -n ufw status 2>/dev/null | grep -q "Status: active"; then
+    local pontOuvert=1
+    for port in "${API_PORT:-4000}" "${DASHBOARD_PORT:-3000}"; do
+      if ! sudo -n ufw status 2>/dev/null | grep -qE "^${port}/tcp[[:space:]]+ALLOW[[:space:]]+172\.16\.0\.0/12"; then
+        if [[ "$SIMULATION" == "1" ]]; then
+          info "[simulation] ufw allow from 172.16.0.0/12 to any port ${port} proto tcp"
+        else
+          sudo -n ufw allow from 172.16.0.0/12 to any port "$port" proto tcp \
+            comment "Conteneur Nginx vers l'hôte" >/dev/null 2>&1 || pontOuvert=0
+        fi
+      fi
+    done
+    [[ "$pontOuvert" == "1" ]] \
+      && ok "Le conteneur Nginx peut joindre l'hôte (ports ${API_PORT:-4000} et ${DASHBOARD_PORT:-3000})" \
+      || avertir "Règles de pare-feu non posées : Nginx rendra 504 sur l'API et le
+      tableau de bord. À faire à la main :
+        sudo ufw allow from 172.16.0.0/12 to any port ${API_PORT:-4000} proto tcp
+        sudo ufw allow from 172.16.0.0/12 to any port ${DASHBOARD_PORT:-3000} proto tcp"
+  fi
 }
 
 # ============================================================================
