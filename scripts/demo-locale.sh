@@ -154,13 +154,13 @@ demarrer() {
     info "Démarrage de MinIO…"
     docker run -d --name gtfc-demo-minio -p ${PORT_MINIO}:9000 \
       -e MINIO_ROOT_USER=cle_demo -e MINIO_ROOT_PASSWORD=secret_demo_minio \
-      minio/minio:RELEASE.2024-10-13T13-34-11Z server /data >/dev/null
+      quay.io/minio/minio:RELEASE.2024-10-13T13-34-11Z server /data >/dev/null
     for i in $(seq 1 30); do
       docker exec gtfc-demo-minio mc ready local >/dev/null 2>&1 && break; sleep 2
     done
     docker run --rm --network host \
       -e "MC_HOST_d=http://cle_demo:secret_demo_minio@127.0.0.1:${PORT_MINIO}" \
-      minio/mc:RELEASE.2024-10-08T09-37-26Z \
+      quay.io/minio/mc:RELEASE.2024-10-08T09-37-26Z \
       mb --ignore-existing d/gtfc-photos d/gtfc-documents d/gtfc-qrcodes >/dev/null 2>&1
     ok "MinIO démarré, buckets créés"
   fi

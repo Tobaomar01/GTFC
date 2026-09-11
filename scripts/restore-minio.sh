@@ -101,7 +101,7 @@ docker inspect -f '{{.State.Running}}' gtfc-minio 2>/dev/null | grep -q true \
 MC=(docker run --rm --network gtfc-net
     -v "${DEPUIS}:/backup"
     -e "MC_HOST_gtfc=http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000"
-    minio/mc:RELEASE.2024-10-08T09-37-26Z)
+    quay.io/minio/mc:RELEASE.2024-10-08T09-37-26Z)
 
 if [[ ${#BUCKETS_DEMANDES[@]} -gt 0 ]]; then
     BUCKETS=("${BUCKETS_DEMANDES[@]}")

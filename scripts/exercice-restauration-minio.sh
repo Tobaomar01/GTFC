@@ -60,7 +60,7 @@ docker inspect -f '{{.State.Running}}' gtfc-minio 2>/dev/null | grep -q true \
 MC=(docker run --rm --network gtfc-net
     -v "${DOSSIER}:/backup"
     -e "MC_HOST_gtfc=http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000"
-    minio/mc:RELEASE.2024-10-08T09-37-26Z)
+    quay.io/minio/mc:RELEASE.2024-10-08T09-37-26Z)
 
 BUCKETS=("$MINIO_BUCKET_PHOTOS" "$MINIO_BUCKET_DOCUMENTS" "$MINIO_BUCKET_QRCODES")
 ECHECS=0

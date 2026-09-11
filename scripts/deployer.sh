@@ -329,9 +329,16 @@ etape_4() {
   info "Obtention des certificats Let's Encrypt…"
   executer bash "${RACINE}/scripts/init-ssl.sh" </dev/null || abandonner \
     "L'obtention des certificats a échoué." \
-    "Causes fréquentes :
-  · port 80 non redirigé sur la box Sonatel
-  · DNS non propagé
+    "Le DNS vient d'être vérifié à l'étape 3 : cherchez AILLEURS d'abord.
+Causes, de la plus fréquente à la moins :
+  · une IMAGE Docker introuvable — init-ssl.sh démarre Nginx, et un
+    « pull access denied » arrête tout AVANT que Let's Encrypt soit appelé.
+    Le 11/09/2026, minio/minio avait disparu de Docker Hub ; ce message
+    accusait alors le port 80, qui n'y était pour rien, et le diagnostic
+    est parti dans la mauvaise direction.
+    Vérifier :  docker compose pull
+  · port 80 fermé ou non redirigé jusqu'à ce serveur
+  · DNS modifié depuis l'étape 3, ou cache du résolveur
 Détail : tail -50 infra/certbot/log/letsencrypt.log
 Pour tester sans consommer le quota : LETSENCRYPT_STAGING=1 dans le .env"
   ok "Certificats obtenus"

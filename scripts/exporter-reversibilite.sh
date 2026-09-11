@@ -278,7 +278,7 @@ if [[ $AVEC_OBJETS -eq 1 ]] && docker inspect -f '{{.State.Running}}' gtfc-minio
     for B in "${MINIO_BUCKET_PHOTOS}" "${MINIO_BUCKET_DOCUMENTS}" "${MINIO_BUCKET_QRCODES}"; do
         N=$(MSYS_NO_PATHCONV=1 docker run --rm --network gtfc-net \
               -e "MC_HOST_gtfc=http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000" \
-              minio/mc:RELEASE.2024-10-08T09-37-26Z \
+              quay.io/minio/mc:RELEASE.2024-10-08T09-37-26Z \
               ls --recursive "gtfc/${B}" 2>/dev/null | grep -c . || true)
         ATTENDUS=$((ATTENDUS + N))
 
@@ -287,7 +287,7 @@ if [[ $AVEC_OBJETS -eq 1 ]] && docker inspect -f '{{.State.Running}}' gtfc-minio
         if ! MSYS_NO_PATHCONV=1 docker run --rm --network gtfc-net \
                 -v "${ABSOLU}:/sortie" \
                 -e "MC_HOST_gtfc=http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000" \
-                minio/mc:RELEASE.2024-10-08T09-37-26Z \
+                quay.io/minio/mc:RELEASE.2024-10-08T09-37-26Z \
                 mirror --overwrite --quiet "gtfc/${B}" "/sortie/${B}" >/dev/null 2>&1; then
             echo "    ECHEC du miroir de ${B}" >&2
             exit 1
