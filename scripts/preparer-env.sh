@@ -29,6 +29,13 @@
 # qui passe partout, en tirant plus long pour garder la même solidité.
 set -euo pipefail
 
+# Tout fichier créé par ce script l'est en 600. Sans cela, le fichier
+# TEMPORAIRE de `poser()` naît avec les droits par défaut — 664 sur Ubuntu — et
+# le `mv` qui le met en place REMPLACE le .env avec ces droits-là. Constaté le
+# 11/09/2026 sur le premier vrai serveur : le .env produit était lisible par
+# tous les comptes de la machine, mot de passe de la base compris.
+umask 077
+
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODELE="${RACINE}/.env.template"
 CIBLE="${RACINE}/.env"
@@ -164,6 +171,9 @@ poser() {
     fi
   done < "$CIBLE"
   mv "$tampon" "$CIBLE"
+  # Le mv remplace le fichier ET ses droits. On les repose ici, à l'endroit
+  # même où ils se perdaient, plutôt qu'une seule fois au début.
+  chmod 600 "$CIBLE"
   [[ "$trouve" == 1 ]] || abandonner "La clé ${cle} n'existe pas dans le modèle."
 }
 
