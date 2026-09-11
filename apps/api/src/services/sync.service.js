@@ -587,12 +587,51 @@ async function paquetHorsLigne(contexte, { depuis = null, zoneId = null } = {}) 
     //  doublerait le poids du paquet pour rien, sur une connexion 3G de
     //  marche couvert.
     // -----------------------------------------------------------------------
+    // -----------------------------------------------------------------------
+    //  UN `.catch()` NE SUFFIT PAS DANS UNE TRANSACTION.
+    //
+    //  CE QUI A ÉTÉ CONSTATÉ le 11/09/2026, à la recette du premier serveur :
+    //  /sync/paquet rendait 500 pour un administrateur de commune, avec
+    //
+    //      25P02 : current transaction is aborted,
+    //              commands ignored until end of transaction block
+    //
+    //  L'appel à composer_feuille_route était protégé par un
+    //  `.catch(() => ({ rows: [null] }))`, dont l'intention est lisible : « si
+    //  la feuille ne peut pas être composée, tant pis, on continue ».
+    //
+    //  Mais PostgreSQL ne permet pas d'ignorer une instruction qui a échoué :
+    //  la transaction entière passe en état abandonné, et TOUT ce qui suit est
+    //  refusé. Le catch attrapait bien l'erreur côté JavaScript, et laissait le
+    //  code poursuivre sur une transaction morte. Résultat : non pas une
+    //  dégradation gracieuse, mais une panne TOTALE — et silencieuse, puisque
+    //  l'erreur d'origine était avalée et que celle qu'on voyait n'en parlait
+    //  pas.
+    //
+    //  La fonction refusait à juste titre : « une feuille de route ne se
+    //  compose que pour un agent ». On ne la sollicite donc que pour un agent.
+    //
+    //  Et on la protège par un POINT DE REPRISE : c'est la seule façon
+    //  d'ignorer réellement l'échec d'une instruction facultative. Ce qui vaut
+    //  pour celle-ci vaudra pour la suivante.
+    // -----------------------------------------------------------------------
     let feuille = null;
-    if (contexte.utilisateurId) {
-      const { rows: [f] } = await client.query(
-        `SELECT app.composer_feuille_route($1, current_date) AS id`,
-        [contexte.utilisateurId],
-      ).catch(() => ({ rows: [null] }));
+    if (contexte.utilisateurId && contexte.role === 'agent') {
+      let f = null;
+      await client.query('SAVEPOINT feuille_de_route');
+      try {
+        const { rows } = await client.query(
+          `SELECT app.composer_feuille_route($1, current_date) AS id`,
+          [contexte.utilisateurId],
+        );
+        [f] = rows;
+        await client.query('RELEASE SAVEPOINT feuille_de_route');
+      } catch (err) {
+        await client.query('ROLLBACK TO SAVEPOINT feuille_de_route');
+        logger.warn({ err: err.message, agent: contexte.utilisateurId },
+          'Feuille de route non composée — le paquet part sans elle');
+        f = null;
+      }
 
       if (f?.id) {
         const [entete, lignes] = await Promise.all([

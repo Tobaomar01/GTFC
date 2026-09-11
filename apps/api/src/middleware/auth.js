@@ -182,6 +182,10 @@ function authentifier(req, _res, next) {
   req.contexte = {
     utilisateurId: charge.sub,
     communeId: charge.cid,
+    // Le RÔLE, et pas seulement « est-il super-admin ». Sans lui, un service ne
+    // peut pas savoir s'il a affaire à un agent, et tente des opérations que la
+    // base refusera — ce qui a coûté un 500 sur /sync/paquet le 11/09/2026.
+    role: charge.role,
     superAdmin: charge.role === 'super_admin',
     ip: req.ip,
   };
