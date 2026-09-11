@@ -121,7 +121,46 @@ step "3/6  Certificat auto-signé temporaire"
 # ============================================================================
 # Nginx refuse de démarrer si le fichier de certificat référencé n'existe pas.
 # On dépose donc un certificat factice, le temps que Certbot le remplace.
-if [[ -f "${LIVE_DIR}/fullchain.pem" ]]; then
+# ----------------------------------------------------------------------------
+#  Distinguer un VRAI certificat de notre propre bouchon.
+#
+#  CE QUI A ÉTÉ CONSTATÉ le 11/09/2026, au premier déploiement réel.
+#
+#  Ce script dépose un certificat auto-signé d'un jour pour que Nginx accepte
+#  de démarrer, puis demande le vrai à Let's Encrypt. Si quelque chose échoue
+#  entre les deux — une image Docker manquante, ce fut le cas — le bouchon
+#  reste sur le disque.
+#
+#  À l'exécution suivante, le script voyait « fullchain.pem existe » et le
+#  conservait. Le déploiement affichait alors « Certificats obtenus ✓ » sur un
+#  certificat auto-signé, valable vingt-quatre heures, ne couvrant aucun
+#  sous-domaine, et qu'aucun navigateur n'accepte.
+#
+#  Un feu vert sur une preuve fausse : le portail du commerçant serait tombé
+#  le lendemain, et personne n'aurait su pourquoi.
+#
+#  La marque du bouchon est sûre : il est auto-signé, donc son ÉMETTEUR est
+#  identique à son SUJET. Un certificat de Let's Encrypt porte toujours un
+#  émetteur distinct. On lit le fichier depuis le conteneur, qui a les droits —
+#  il appartient à root.
+# ----------------------------------------------------------------------------
+est_bouchon_provisoire() {
+    [[ -f "${LIVE_DIR}/fullchain.pem" ]] || return 1
+    local champs emetteur sujet
+    champs=$(docker run --rm -v "${CERT_DIR}:/etc/letsencrypt" --entrypoint openssl \
+        certbot/certbot:v2.11.0 x509 \
+        -in "/etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem" \
+        -noout -issuer -subject 2>/dev/null) || return 1
+    emetteur=$(sed -n 's/^issuer=//p'  <<<"$champs" | tr -d ' ')
+    sujet=$(   sed -n 's/^subject=//p' <<<"$champs" | tr -d ' ')
+    [[ -n "$emetteur" && "$emetteur" == "$sujet" ]]
+}
+
+if [[ -f "${LIVE_DIR}/fullchain.pem" ]] && est_bouchon_provisoire; then
+    warn "Le certificat présent est le bouchon auto-signé d'une exécution
+      précédente — pas un certificat valide. Il sera remplacé."
+    EXISTING_CERT=0
+elif [[ -f "${LIVE_DIR}/fullchain.pem" ]]; then
     info "Un certificat existe déjà dans ${LIVE_DIR} — conservé."
     EXISTING_CERT=1
 else
