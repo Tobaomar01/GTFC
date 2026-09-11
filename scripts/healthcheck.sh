@@ -119,13 +119,38 @@ else
     ko "Configuration Nginx INVALIDE (docker compose logs nginx)"
 fi
 
+# ---------------------------------------------------------------------------
+#  Le certificat se lit DEPUIS LE CONTENEUR, pas depuis l'hôte.
+#
+#  CE QUI A ÉTÉ CONSTATÉ le 11/09/2026 : ce contrôle annonçait « Aucun
+#  certificat » sur une installation dont le certificat Let's Encrypt était
+#  parfaitement valide, et dont les trois lignes suivantes montraient HTTPS en
+#  train de répondre. Une fausse alerte, donc — la pire espèce : elle apprend à
+#  ne plus lire le contrôle.
+#
+#  La cause : certbot range ses fichiers avec des droits réservés à root. Ce
+#  script tourne sous le compte applicatif, ne peut pas traverser le dossier, et
+#  « [[ -f ]] » rend faux. Il ne constatait pas une absence, il constatait sa
+#  propre cécité — et disait la première.
+#
+#  On lit donc par le conteneur certbot, qui monte ce dossier et a les droits.
+# ---------------------------------------------------------------------------
 CERT="infra/certbot/conf/live/${APP_DOMAIN}/fullchain.pem"
-if [[ -f "$CERT" ]]; then
-    exp_date=$(openssl x509 -enddate -noout -in "$CERT" 2>/dev/null | cut -d= -f2)
+lire_certificat() {
+    docker run --rm -v "$(pwd)/infra/certbot/conf:/etc/letsencrypt"         --entrypoint openssl certbot/certbot:v2.11.0 x509         -in "/etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem" "$@" 2>/dev/null
+}
+
+if lire_certificat -noout >/dev/null; then
+    exp_date=$(lire_certificat -enddate -noout | cut -d= -f2)
     exp_epoch=$(date -d "$exp_date" +%s 2>/dev/null || echo 0)
     days=$(( (exp_epoch - $(date +%s)) / 86400 ))
-    issuer=$(openssl x509 -issuer -noout -in "$CERT" 2>/dev/null)
-    if [[ "$issuer" == *"$APP_DOMAIN"* ]]; then
+    emetteur=$(lire_certificat -issuer -noout | sed 's/^issuer=//' | tr -d ' ')
+    sujet=$(lire_certificat -subject -noout | sed 's/^subject=//' | tr -d ' ')
+
+    # Auto-signé : émetteur identique au sujet. C'est la marque du bouchon
+    # provisoire que pose init-ssl.sh, et non une comparaison au nom de domaine
+    # — un vrai certificat porte lui aussi le domaine dans son sujet.
+    if [[ -n "$emetteur" && "$emetteur" == "$sujet" ]]; then
         warn "Certificat AUTO-SIGNÉ — relancez scripts/init-ssl.sh"
     elif [[ $days -lt 0 ]]; then
         ko "Certificat EXPIRÉ depuis $(( -days )) jours"
@@ -134,10 +159,10 @@ if [[ -f "$CERT" ]]; then
     else
         ok "Certificat valide encore $days jours"
     fi
-    names=$(openssl x509 -noout -ext subjectAltName -in "$CERT" 2>/dev/null | tail -1 | tr -d ' ')
-    ok "Noms couverts : ${names//DNS:/}"
+    names=$(lire_certificat -noout -ext subjectAltName | tail -1 | tr -d ' ')
+    [[ -n "$names" ]] && ok "Noms couverts : ${names//DNS:/}"
 else
-    ko "Aucun certificat dans $CERT"
+    ko "Aucun certificat lisible dans $CERT"
 fi
 
 for host in "$APP_DOMAIN" "api.$APP_DOMAIN" "gtfc.$APP_DOMAIN"; do
@@ -157,16 +182,45 @@ done
 # ---------------------------------------------------------------------------
 head_ "5. Services applicatifs (PM2)"
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+#  La sortie de PM2 se lit avec un analyseur JSON, pas avec grep et sed.
+#
+#  CE QUI A ÉTÉ CONSTATÉ le 11/09/2026 : cette section n'affichait RIEN. Ni
+#  service, ni avertissement, ni erreur — une rubrique vide, sur une machine où
+#  six processus PM2 tournaient.
+#
+#  La cause : le motif « "name":"…","pm2_env":{…"status":"…" » supposait un
+#  ordre et un voisinage de champs que PM2 7 ne produit plus. Le premier grep,
+#  lui, trouvait « "name" » et faisait entrer dans la branche ; le second ne
+#  correspondait à rien, la boucle ne s'exécutait pas, et personne ne l'apprenait.
+#
+#  Un contrôle qui ne contrôle rien EN SILENCE est pire qu'un contrôle absent :
+#  l'absence se remarque, le silence se prend pour un succès.
+#
+#  Node est installé sur ce serveur — c'est une dépendance de la plateforme.
+#  Autant s'en servir pour lire du JSON.
+# ---------------------------------------------------------------------------
 if command -v pm2 >/dev/null 2>&1; then
-    if [[ -n "$(pm2 jlist 2>/dev/null | grep -o '"name"' || true)" ]]; then
-        pm2 jlist 2>/dev/null | \
-          grep -o '"name":"[^"]*","pm2_env":{[^}]*"status":"[^"]*"' | \
-          sed 's/.*"name":"\([^"]*\)".*"status":"\([^"]*\)".*/\1 \2/' | \
-          while read -r name status; do
-              [[ "$status" == "online" ]] && ok "$name : $status" || ko "$name : $status"
-          done
-    else
+    services=$(pm2 jlist 2>/dev/null | node -e '
+        let d = "";
+        process.stdin.on("data", (c) => { d += c; })
+          .on("end", () => {
+            let liste = [];
+            try { liste = JSON.parse(d); } catch { process.exit(2); }
+            for (const p of liste) {
+              console.log(`${p.name} ${p.pm2_env?.status ?? "inconnu"}`);
+            }
+          });' 2>/dev/null) || services=""
+
+    if [[ -n "$services" ]]; then
+        while read -r name status; do
+            [[ -z "$name" ]] && continue
+            [[ "$status" == "online" ]] && ok "$name : $status" || ko "$name : $status"
+        done <<<"$services"
+    elif pm2 jlist >/dev/null 2>&1; then
         warn "Aucun service PM2 (normal tant que les phases 3 et 6 ne sont pas déployées)"
+    else
+        ko "PM2 ne répond pas — impossible de savoir si les services tournent"
     fi
 else
     warn "PM2 non installé"
